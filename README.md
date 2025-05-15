@@ -1,3 +1,5 @@
+This project is for demonstration purposes only. For code access or questions, please contact me.
+
 # Kanban Task Management App
 
 A modern task management application built with Next.js 15, React 19, Tailwind CSS, and Shadcn UI components. This app allows you to manage tasks in a Kanban-style board, assign tasks to team members, and track progress with an intuitive drag-and-drop interface.
