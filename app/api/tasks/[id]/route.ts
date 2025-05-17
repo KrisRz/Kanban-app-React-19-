@@ -4,10 +4,10 @@ import { type TaskUpdate } from '@/db/repositories/task-repository';
 
 export async function GET(
   request: Request,
-  context: { params: { id: string } }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const taskId = parseInt(context.params.id, 10);
+    const taskId = parseInt(params.id, 10);
     if (isNaN(taskId)) {
       return NextResponse.json(
         { error: 'Invalid task ID' },
@@ -36,10 +36,10 @@ export async function GET(
 
 export async function PUT(
   request: Request,
-  context: { params: { id: string } }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const taskId = parseInt(context.params.id, 10);
+    const taskId = parseInt(params.id, 10);
     if (isNaN(taskId)) {
       return NextResponse.json(
         { error: 'Invalid task ID' },
@@ -78,10 +78,10 @@ export async function PUT(
 
 export async function DELETE(
   request: Request,
-  context: { params: { id: string } }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const taskId = parseInt(context.params.id, 10);
+    const taskId = parseInt(params.id, 10);
     if (isNaN(taskId)) {
       return NextResponse.json(
         { error: 'Invalid task ID' },
