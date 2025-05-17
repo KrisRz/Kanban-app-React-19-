@@ -6,9 +6,11 @@ import { Users } from 'lucide-react'
 import { getUserCount } from '@/lib/actions'
 import { useEffect, useState } from 'react'
 import { Badge } from './ui/badge'
+import { usePathname } from 'next/navigation'
 
 export function Navbar() {
   const [userCount, setUserCount] = useState<number | null>(null)
+  const pathname = usePathname()
 
   useEffect(() => {
     async function fetchUserCount() {
@@ -17,7 +19,12 @@ export function Navbar() {
     }
     
     fetchUserCount()
-  }, [])
+    
+    // Re-fetch user count on each navigation
+    const interval = setInterval(fetchUserCount, 5000)
+    
+    return () => clearInterval(interval)
+  }, [pathname]) // Re-run when pathname changes
   
   return (
     <div className="w-full flex justify-center mt-4">

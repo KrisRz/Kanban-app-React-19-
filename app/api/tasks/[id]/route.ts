@@ -3,11 +3,11 @@ import { getTaskById, updateTask, deleteTask } from '@/db/repositories/task-repo
 import { type TaskUpdate } from '@/db/repositories/task-repository';
 
 export async function GET(
-  req: Request,
-  { params }: { params: { id: string } }
+  request: Request,
+  context: { params: { id: string } }
 ) {
   try {
-    const taskId = parseInt(params.id, 10);
+    const taskId = parseInt(context.params.id, 10);
     if (isNaN(taskId)) {
       return NextResponse.json(
         { error: 'Invalid task ID' },
@@ -35,11 +35,11 @@ export async function GET(
 }
 
 export async function PUT(
-  req: Request,
-  { params }: { params: { id: string } }
+  request: Request,
+  context: { params: { id: string } }
 ) {
   try {
-    const taskId = parseInt(params.id, 10);
+    const taskId = parseInt(context.params.id, 10);
     if (isNaN(taskId)) {
       return NextResponse.json(
         { error: 'Invalid task ID' },
@@ -47,7 +47,7 @@ export async function PUT(
       );
     }
 
-    const body = await req.json();
+    const body = await request.json();
     const taskData: TaskUpdate = {
       id: taskId,
       title: body.title,
@@ -77,11 +77,11 @@ export async function PUT(
 }
 
 export async function DELETE(
-  req: Request,
-  { params }: { params: { id: string } }
+  request: Request,
+  context: { params: { id: string } }
 ) {
   try {
-    const taskId = parseInt(params.id, 10);
+    const taskId = parseInt(context.params.id, 10);
     if (isNaN(taskId)) {
       return NextResponse.json(
         { error: 'Invalid task ID' },

@@ -56,14 +56,6 @@ export const TaskCard = forwardRef<HTMLDivElement, TaskCardProps>(
       data: { type: 'task', task }
     })
 
-    // Debug logs
-    console.log(`TaskCard ${task.id} rendering:`, { 
-      attributes, 
-      listeners, 
-      transform,
-      isDragging
-    });
-
     const style = {
       transform: CSS.Transform.toString(transform),
       transition,
@@ -172,4 +164,6 @@ export const TaskCard = forwardRef<HTMLDivElement, TaskCardProps>(
       </div>
     );
   }
-) 
+)
+
+TaskCard.displayName = 'TaskCard'; 

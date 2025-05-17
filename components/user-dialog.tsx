@@ -50,7 +50,7 @@ export interface UserDialogProps {
 
 type FieldErrors = Record<string, string>
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_FILE_SIZE = 2 * 1024 * 1024; // Reduced to 2MB for base64 storage
 const ALLOWED_FILE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 
 // Define available roles for the select dropdown
@@ -141,6 +141,13 @@ export function UserDialog({
         })
         onOpenChange(false)
         router.refresh()
+        
+        // Redirect to users list page after successful update
+        if (mode === "edit" && !embedded) {
+          router.push("/users")
+        } else if (mode === "edit" && embedded) {
+          router.push(`/users/${user?.id}`)
+        }
       } else {
         if (result.fieldErrors) {
           setFieldErrors(result.fieldErrors)
@@ -239,7 +246,7 @@ export function UserDialog({
       return
     }
     
-    // Validate file size
+    // Validate file size - reduced to 2MB since base64 increases size
     if (file.size > MAX_FILE_SIZE) {
       setUploadError(`File is too large. Maximum size is ${MAX_FILE_SIZE / (1024 * 1024)}MB`)
       return
@@ -248,6 +255,7 @@ export function UserDialog({
     const reader = new FileReader()
     reader.onload = (e) => {
       if (e.target?.result) {
+        // The result is already a base64 string that can be stored directly
         setTempAvatar(e.target.result.toString())
       }
     }
@@ -365,7 +373,7 @@ export function UserDialog({
                   <Button 
                     type="button" 
                     variant="outline" 
-                    className="rounded-lg border-gray-300 dark:border-gray-700"
+                    className="rounded-lg border-gray-300 dark:border-gray-700 flex items-center gap-1"
                     onClick={handleRandomAvatar}
                   >
                     Random Avatar
@@ -387,7 +395,7 @@ export function UserDialog({
                 )}
                 
                 <div className="text-xs text-gray-500 dark:text-gray-400">
-                  Accepted formats: JPEG, PNG, GIF, WebP. Maximum size: 5MB.
+                  Accepted formats: JPEG, PNG, GIF, WebP. Maximum size: 2MB.
                 </div>
               </div>
             </TabsContent>
@@ -477,21 +485,12 @@ export function UserDialog({
               Cannot Delete User
             </AlertDialogTitle>
             <AlertDialogDescription>
-              This user has {assignedTasks.length} task{assignedTasks.length === 1 ? '' : 's'} assigned and cannot be deleted until these tasks are reassigned or completed:
+              This user has {assignedTasks.length} task{assignedTasks.length === 1 ? '' : 's'} assigned and cannot be deleted.
+              <span className="block mt-2 text-sm font-medium">
+                Please reassign or complete these tasks before deleting this user.
+              </span>
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="max-h-[300px] overflow-y-auto border rounded-md p-4 my-4">
-            <ul className="space-y-2">
-              {assignedTasks.map(task => (
-                <li key={task.id} className="border-b pb-2">
-                  <div className="font-medium">{task.title}</div>
-                  <div className="text-sm text-muted-foreground">
-                    Status: <span className="capitalize">{task.status.replace('-', ' ')}</span>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
           <AlertDialogFooter>
             <AlertDialogAction onClick={() => setShowTasksDialog(false)}>
               Close

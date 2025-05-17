@@ -1,13 +1,10 @@
 import { Suspense } from 'react'
-import { getUsers } from '@/lib/actions'
+import { getUsers, getUserTaskCounts } from '@/lib/actions'
 import { Button } from '@/components/ui/button'
 import { UserPlus, Users } from 'lucide-react'
 import Link from 'next/link'
 import { User } from '@/lib/types'
 import { UserCard } from '@/components/user-card'
-
-// Helper function to simulate loading delay
-const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export default async function UsersPage() {
   return (
@@ -62,9 +59,7 @@ function UsersSkeleton() {
 }
 
 async function UsersList() {
-  // Add artificial delay to simulate loading
-  await sleep(3000);
-  
+  // Get users directly without artificial delay
   const users = await getUsers()
   
   if (users.length === 0) {
@@ -85,11 +80,11 @@ async function UsersList() {
     )
   }
   
-  // Generate random task counts for demo purposes
-  const userTaskCounts = users.reduce((acc, user) => {
-    acc[user.id] = Math.floor(Math.random() * 8); // 0-7 tasks
-    return acc;
-  }, {} as Record<number, number>);
+  // Fetch the actual task counts for all users
+  const taskCountsResult = await getUserTaskCounts();
+  
+  // Use the fetched task counts or default to empty object if there was an error
+  const userTaskCounts = taskCountsResult.success ? taskCountsResult.taskCounts : {};
   
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -97,7 +92,7 @@ async function UsersList() {
         <UserCard 
           key={user.id} 
           user={user} 
-          taskCount={userTaskCounts[user.id]} 
+          taskCount={userTaskCounts[user.id] || 0} 
         />
       ))}
     </div>

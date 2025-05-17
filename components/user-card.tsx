@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { User } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { ExternalLink, Briefcase, Mail, BarChart4, User as UserIcon, Pencil } from 'lucide-react';
+import Image from 'next/image';
 
 // Map of roles to colors
 const roleColors: Record<string, { bg: string; text: string }> = {
@@ -42,10 +43,12 @@ export function UserCard({ user, taskCount = 0 }: UserCardProps) {
         <Link href={`/users/${user.id}`} className="block">
           <div className="flex items-center gap-4">
             {user.avatar ? (
-              <img
+              <Image
                 src={user.avatar}
-                alt={user.name}
+                alt={`${user.name}'s profile picture`}
                 className="w-14 h-14 rounded-full object-cover border-2 border-gray-100 dark:border-zinc-700"
+                width={56}
+                height={56}
               />
             ) : (
               <div className="w-14 h-14 rounded-full bg-blue-500 flex items-center justify-center text-xl font-medium text-white">
@@ -60,11 +63,9 @@ export function UserCard({ user, taskCount = 0 }: UserCardProps) {
                   {user.role || 'Team Member'}
                 </span>
                 
-                {taskCount > 0 && (
-                  <span className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded-md dark:bg-zinc-700 dark:text-gray-300">
-                    {taskCount} {taskCount === 1 ? 'task' : 'tasks'}
-                  </span>
-                )}
+                <span className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded-md dark:bg-zinc-700 dark:text-gray-300">
+                  {taskCount} {taskCount === 1 ? 'task' : 'tasks'}
+                </span>
               </div>
             </div>
           </div>

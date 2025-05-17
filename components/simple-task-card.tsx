@@ -1,14 +1,19 @@
+"use client"
+
 import React, { forwardRef, useState } from 'react';
 import { Task } from '@/lib/types';
 import { Pencil, Trash2, Clock, CheckCircle2, CircleDashed } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface SimpleTaskCardProps {
   task: Task;
   onDragStart?: () => void;
+  onEdit?: (task: Task) => void;
+  onDelete?: (taskId: number) => void;
 }
 
 const SimpleTaskCard = forwardRef<HTMLDivElement, SimpleTaskCardProps>(
-  ({ task, onDragStart }, ref) => {
+  ({ task, onDragStart, onEdit, onDelete }, ref) => {
     const [isHovered, setIsHovered] = useState(false);
     
     // Handle onDragStart
@@ -18,9 +23,6 @@ const SimpleTaskCard = forwardRef<HTMLDivElement, SimpleTaskCardProps>(
       // Set data for drop target to identify this task
       e.dataTransfer.setData('text/plain', task.id.toString());
       e.dataTransfer.effectAllowed = 'move';
-      
-      // Log for debugging
-      console.log('Drag started for task:', task.id);
       
       // Call parent handler if provided
       if (onDragStart) {
@@ -92,10 +94,22 @@ const SimpleTaskCard = forwardRef<HTMLDivElement, SimpleTaskCardProps>(
           
           {/* Actions that appear on hover */}
           <div className={`flex justify-end gap-1 ${isHovered ? 'opacity-100' : 'opacity-0'} transition-opacity`}>
-            <button className="p-1 text-gray-500 hover:text-blue-600 rounded-full hover:bg-blue-50 dark:hover:bg-blue-900/30">
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onEdit) onEdit(task);
+              }}
+              className="p-1 text-gray-500 hover:text-blue-600 rounded-full hover:bg-blue-50 dark:hover:bg-blue-900/30"
+            >
               <Pencil className="w-4 h-4" />
             </button>
-            <button className="p-1 text-gray-500 hover:text-red-600 rounded-full hover:bg-red-50 dark:hover:bg-red-900/30">
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onDelete) onDelete(task.id);
+              }}
+              className="p-1 text-gray-500 hover:text-red-600 rounded-full hover:bg-red-50 dark:hover:bg-red-900/30"
+            >
               <Trash2 className="w-4 h-4" />
             </button>
           </div>
@@ -104,9 +118,14 @@ const SimpleTaskCard = forwardRef<HTMLDivElement, SimpleTaskCardProps>(
           <div className="flex justify-between items-center text-xs mt-1 pt-3 border-t border-gray-100 dark:border-gray-700">
             {task.assignee ? (
               <div className="flex items-center gap-2">
-                <div className={`h-6 w-6 rounded-full bg-blue-${(task.assignee.id % 5) + 1}00 text-white flex items-center justify-center text-xs font-medium`}>
-                  {getInitials(task.assignee.name)}
-                </div>
+                <Avatar className="h-6 w-6">
+                  {task.assignee.avatar ? (
+                    <AvatarImage src={task.assignee.avatar} alt={task.assignee.name} />
+                  ) : null}
+                  <AvatarFallback className="text-xs bg-primary text-white">
+                    {getInitials(task.assignee.name)}
+                  </AvatarFallback>
+                </Avatar>
                 <span className="text-gray-600 dark:text-gray-300">{task.assignee.name}</span>
               </div>
             ) : (

@@ -9,13 +9,7 @@ import { notFound } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
 import { Task } from '@/lib/types'
 
-// Helper function to simulate loading delay
-const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
 export default async function UserProfilePage({ params }: { params: { id: string } }) {
-  // Add artificial delay to simulate loading
-  await sleep(3000);
-  
   const userId = parseInt(params.id)
   
   if (isNaN(userId)) {

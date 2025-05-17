@@ -7,12 +7,12 @@ import { TaskDialog } from './task-dialog'
 import { UserDialog } from './user-dialog'
 import { 
   updateTaskStatus, 
-  updateTaskAssignee as updateTaskAssigneeAction,
   assignTaskAction
 } from '@/lib/actions'
 import { useToast } from '@/components/ui/use-toast'
 import { Task, User, Column } from '@/lib/types'
 import SimpleTaskCard from './simple-task-card'
+import { useRouter } from 'next/navigation'
 
 // DroppableColumn component for each status column
 interface DroppableColumnProps {
@@ -20,10 +20,12 @@ interface DroppableColumnProps {
   column: Column
   tasks: Task[]
   onDrop: (taskId: number, columnId: string) => void
+  onEditTask: (task: Task) => void
+  onDeleteTask: (taskId: number) => void
 }
 
 const DroppableColumn = forwardRef<HTMLDivElement, DroppableColumnProps>(
-  ({ id, column, tasks: columnTasks, onDrop }, ref) => {
+  ({ id, column, tasks: columnTasks, onDrop, onEditTask, onDeleteTask }, ref) => {
     const [isOver, setIsOver] = useState(false);
     
     // Handle drag over
@@ -46,7 +48,6 @@ const DroppableColumn = forwardRef<HTMLDivElement, DroppableColumnProps>(
       // Get the task ID from the dataTransfer
       const taskId = e.dataTransfer.getData('text/plain');
       if (taskId) {
-        console.log(`Dropped task ${taskId} into column ${id}`);
         onDrop(parseInt(taskId), id);
       }
     };
@@ -94,7 +95,9 @@ const DroppableColumn = forwardRef<HTMLDivElement, DroppableColumnProps>(
                 <SimpleTaskCard
                   key={task.id}
                   task={task}
-                  onDragStart={() => console.log('Drag started from column:', id, 'task:', task.id)}
+                  onDragStart={() => {}}
+                  onEdit={onEditTask}
+                  onDelete={onDeleteTask}
                 />
               ))
             )}
@@ -116,7 +119,7 @@ interface KanbanBoardProps {
 
 export function KanbanBoard({ initialColumns, initialTasks, teamMembers }: KanbanBoardProps) {
   // State initialized with server-fetched data
-  const [columns, setColumns] = useState<Column[]>(initialColumns)
+  const [columns] = useState<Column[]>(initialColumns)
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
   
   // Dialog state
@@ -149,17 +152,13 @@ export function KanbanBoard({ initialColumns, initialTasks, teamMembers }: Kanba
     const taskToUpdate = tasks.find(t => t.id === taskId)
     
     if (!taskToUpdate) {
-      console.error('Task not found:', taskId)
       return
     }
     
     // Don't do anything if dropped in the same column
     if (taskToUpdate.status === newStatus) {
-      console.log('Task dropped in the same column, no action needed')
       return
     }
-    
-    console.log('Moving task:', { taskId, newStatus, taskToUpdate })
     
     // Find the column ID for the new status
     const targetColumn = columns.find(col => {
@@ -170,13 +169,10 @@ export function KanbanBoard({ initialColumns, initialTasks, teamMembers }: Kanba
     })
     
     if (!targetColumn) {
-      console.error('Target column not found for status:', newStatus)
       return
     }
     
     try {
-      console.log('Found target column:', targetColumn)
-      
       // Update task status in state
       const updatedTasks = tasks.map(task => 
         task.id === taskId ? { ...task, status: newStatus, columnId: targetColumn.id } : task
@@ -184,7 +180,6 @@ export function KanbanBoard({ initialColumns, initialTasks, teamMembers }: Kanba
       setTasks(updatedTasks)
       
       // Update task on the server using server action
-      console.log('Updating task on server')
       await updateTaskStatus(taskId, newStatus, targetColumn.id)
       
       toast({
@@ -278,6 +273,19 @@ export function KanbanBoard({ initialColumns, initialTasks, teamMembers }: Kanba
     setUserDialogOpen(true)
   }
 
+  // Function to handle task deletion
+  function handleDeleteTask(taskId: number) {
+    // Find task to check if it has an assignee
+    const taskToDelete = tasks.find(task => task.id === taskId);
+    if (taskToDelete) {
+      setDialogMode('edit');
+      setEditTask(taskToDelete);
+      setTaskDialogOpen(true);
+    }
+  }
+
+  const router = useRouter()
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center mb-6">
@@ -303,6 +311,8 @@ export function KanbanBoard({ initialColumns, initialTasks, teamMembers }: Kanba
           column={columns.find(c => c.name === 'To Do')!} 
           tasks={todoTasks} 
           onDrop={handleDropOnColumn}
+          onEditTask={handleEditTask}
+          onDeleteTask={handleDeleteTask}
         />
         
         <DroppableColumn 
@@ -310,6 +320,8 @@ export function KanbanBoard({ initialColumns, initialTasks, teamMembers }: Kanba
           column={columns.find(c => c.name === 'In Progress')!} 
           tasks={inProgressTasks} 
           onDrop={handleDropOnColumn}
+          onEditTask={handleEditTask}
+          onDeleteTask={handleDeleteTask}
         />
         
         <DroppableColumn 
@@ -317,15 +329,62 @@ export function KanbanBoard({ initialColumns, initialTasks, teamMembers }: Kanba
           column={columns.find(c => c.name === 'Done')!} 
           tasks={doneTasks}
           onDrop={handleDropOnColumn}
+          onEditTask={handleEditTask}
+          onDeleteTask={handleDeleteTask}
         />
       </div>
       
       <TaskDialog
         open={taskDialogOpen}
-        onOpenChange={setTaskDialogOpen}
+        onOpenChange={(open) => {
+          setTaskDialogOpen(open);
+          if (!open) {
+            // No longer need to refresh the page since we're updating state locally
+          }
+        }}
         mode={dialogMode}
         task={editTask}
         teamMembers={teamMembers}
+        onTaskUpdate={(updatedTask: Task) => {
+          // Update local state when a task is updated or created
+          if (updatedTask) {
+            // Check if this is a delete operation
+            if ('_deleted' in updatedTask) {
+              // Remove the deleted task from the state
+              setTasks(prevTasks => prevTasks.filter(task => task.id !== updatedTask.id));
+              return;
+            }
+            
+            // Find the complete user object if there's an assigneeId
+            const taskWithAssignee = {...updatedTask};
+            
+            if (updatedTask.assigneeId) {
+              const assignee = teamMembers.find(user => user.id === updatedTask.assigneeId);
+              if (assignee) {
+                taskWithAssignee.assignee = assignee;
+              }
+            } else {
+              // If assigneeId is null, make sure assignee is also null
+              taskWithAssignee.assignee = undefined;
+            }
+            
+            // Update or add the task based on whether it already exists
+            setTasks(prevTasks => {
+              // Check if this task already exists
+              const taskExists = prevTasks.some(task => task.id === taskWithAssignee.id);
+              
+              if (taskExists) {
+                // Update existing task
+                return prevTasks.map(task => 
+                  task.id === taskWithAssignee.id ? taskWithAssignee : task
+                );
+              } else {
+                // Add new task to the array
+                return [...prevTasks, taskWithAssignee];
+              }
+            });
+          }
+        }}
       />
       
       <UserDialog

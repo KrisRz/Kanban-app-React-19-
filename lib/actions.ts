@@ -2,7 +2,7 @@
 
 import { db } from '@/db'
 import { columns, tasks, users } from '@/db/schema'
-import { eq, desc } from 'drizzle-orm'
+import { eq, desc, asc } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import { ZodError } from 'zod'
 import { 
@@ -36,7 +36,6 @@ export async function getColumns() {
  */
 export async function getTasks() {
   try {
-    console.log('Fetching tasks...')
     // Use direct query to avoid type mismatch issues
     const taskData = await db.select().from(tasks)
     
@@ -56,7 +55,6 @@ export async function getTasks() {
       }
     })
     
-    console.log('Tasks fetched:', data.length)
     return data
   } catch (error) {
     console.error('Failed to fetch tasks:', error)
@@ -352,19 +350,43 @@ export async function createTaskAction(data: {
     const order = tasksInColumn.length;
 
     // Create the task
-    const result = await db.insert(tasks).values({
-      title: validatedData.title,
-      description: validatedData.description,
-      status: validatedData.status,
-      assigneeId: validatedData.assigneeId,
-      columnId: column.id,
-      order: order
-    }).returning();
+    try {
+      // Try PostgreSQL-style with returning
+      const result = await db.insert(tasks).values({
+        title: validatedData.title,
+        description: validatedData.description,
+        status: validatedData.status,
+        assigneeId: validatedData.assigneeId,
+        columnId: column.id,
+        order: order
+      }).returning();
 
-    // Revalidate the path
-    revalidatePath("/");
+      // Revalidate the path
+      revalidatePath("/");
 
-    return { success: true, task: result[0] };
+      return { success: true, task: result[0] };
+    } catch (e) {
+      // If returning() fails, use MySQL approach
+      await db.insert(tasks).values({
+        title: validatedData.title,
+        description: validatedData.description,
+        status: validatedData.status,
+        assigneeId: validatedData.assigneeId,
+        columnId: column.id,
+        order: order
+      });
+      
+      // Fetch the task we just created - get the most recent one with this title
+      const newTask = await db.query.tasks.findFirst({
+        where: eq(tasks.title, validatedData.title),
+        orderBy: (tasks, { desc }) => [desc(tasks.createdAt)]
+      });
+      
+      // Revalidate the path
+      revalidatePath("/");
+
+      return { success: true, task: newTask };
+    }
   } catch (error) {
     if (error instanceof ZodError) {
       console.error("Validation error:", error.errors);
@@ -432,38 +454,76 @@ export async function updateTaskAction(data: {
       const newOrder = tasksInNewColumn.length > 0 ? tasksInNewColumn[0].order + 1 : 0
       
       // Update task with new column and order
-      const result = await db.update(tasks)
-        .set({
-          title: validatedData.title,
-          description: validatedData.description,
-          status: validatedData.status,
-          assigneeId: validatedData.assigneeId,
-          columnId: newColumnId,
-          order: newOrder
+      try {
+        // Try PostgreSQL-style with returning
+        const result = await db.update(tasks)
+          .set({
+            title: validatedData.title,
+            description: validatedData.description,
+            status: validatedData.status,
+            assigneeId: validatedData.assigneeId,
+            columnId: newColumnId,
+            order: newOrder
+          })
+          .where(eq(tasks.id, validatedData.id))
+          .returning()
+        
+        revalidatePath("/")
+        return { success: true, task: result[0] }
+      } catch (e) {
+        // If returning() fails, use MySQL approach
+        await db.update(tasks)
+          .set({
+            title: validatedData.title,
+            description: validatedData.description,
+            status: validatedData.status,
+            assigneeId: validatedData.assigneeId,
+            columnId: newColumnId,
+            order: newOrder
+          })
+          .where(eq(tasks.id, validatedData.id))
+        
+        // Fetch the updated task
+        const updatedTask = await db.query.tasks.findFirst({
+          where: eq(tasks.id, validatedData.id)
         })
-        .where(eq(tasks.id, validatedData.id))
-        .returning()
-      
-      // Revalidate the path
-      revalidatePath('/')
-      
-      return { success: true, task: result[0] }
+        
+        revalidatePath("/")
+        return { success: true, task: updatedTask }
+      }
     } else {
-      // Just update the task data without changing column or order
-      const result = await db.update(tasks)
-        .set({
-          title: validatedData.title,
-          description: validatedData.description,
-          status: validatedData.status,
-          assigneeId: validatedData.assigneeId
+      // Just update the task details, not moving columns
+      try {
+        // Try PostgreSQL-style with returning
+        const result = await db.update(tasks)
+          .set({
+            title: validatedData.title,
+            description: validatedData.description,
+            assigneeId: validatedData.assigneeId
+          })
+          .where(eq(tasks.id, validatedData.id))
+          .returning()
+        
+        revalidatePath("/")
+        return { success: true, task: result[0] }
+      } catch (e) {
+        // If returning() fails, use MySQL approach
+        await db.update(tasks)
+          .set({
+            title: validatedData.title,
+            description: validatedData.description,
+            assigneeId: validatedData.assigneeId
+          })
+          .where(eq(tasks.id, validatedData.id))
+        
+        // Fetch the updated task
+        const updatedTask = await db.query.tasks.findFirst({
+          where: eq(tasks.id, validatedData.id)
         })
-        .where(eq(tasks.id, validatedData.id))
-        .returning()
-      
-      // Revalidate the path
-      revalidatePath('/')
-      
-      return { success: true, task: result[0] }
+        
+        revalidatePath("/")
+        return { success: true, task: updatedTask }
+      }
     }
   } catch (error) {
     console.error("Error updating task:", error)
@@ -593,18 +653,42 @@ export async function createUserAction(data: {
       };
     }
     
+    // Store the avatar directly (whether it's a base64 string or URL)
+    // Base64 strings from FileReader already start with "data:image/"
+    
     // Insert the user
-    const result = await db.insert(users).values({
-      name: data.name,
-      email: data.email,
-      role: data.role,
-      avatar: data.avatar
-    }).returning();
-    
-    // Revalidate the path
-    revalidatePath('/');
-    
-    return { success: true, user: result[0] };
+    try {
+      // Try PostgreSQL-style with returning
+      const result = await db.insert(users).values({
+        name: data.name,
+        email: data.email,
+        role: data.role,
+        avatar: data.avatar
+      }).returning();
+      
+      // Revalidate the path
+      revalidatePath('/');
+      
+      return { success: true, user: result[0] };
+    } catch (e) {
+      // If returning() fails, use MySQL approach
+      await db.insert(users).values({
+        name: data.name,
+        email: data.email,
+        role: data.role,
+        avatar: data.avatar
+      });
+      
+      // Fetch the user we just created
+      const newUser = await db.query.users.findFirst({
+        where: eq(users.email, data.email)
+      });
+      
+      // Revalidate the path
+      revalidatePath('/');
+      
+      return { success: true, user: newUser };
+    }
   } catch (error) {
     console.error("Error creating user:", error);
     
@@ -650,21 +734,48 @@ export async function updateUserAction(data: {
       }
     }
     
+    // Store the avatar directly (whether it's a base64 string or URL)
+    // If no new avatar is provided, keep the existing one
+    const avatarToUse = data.avatar || existingUser.avatar;
+    
     // Update the user
-    const result = await db.update(users)
-      .set({
-        name: data.name,
-        email: data.email,
-        role: data.role,
-        avatar: data.avatar
-      })
-      .where(eq(users.id, data.id))
-      .returning();
-    
-    // Revalidate the path
-    revalidatePath('/');
-    
-    return { success: true, user: result[0] };
+    try {
+      // Try PostgreSQL-style with returning
+      const result = await db.update(users)
+        .set({
+          name: data.name,
+          email: data.email,
+          role: data.role,
+          avatar: avatarToUse
+        })
+        .where(eq(users.id, data.id))
+        .returning();
+      
+      // Revalidate the path
+      revalidatePath('/');
+      
+      return { success: true, user: result[0] };
+    } catch (e) {
+      // If returning() fails, use MySQL approach
+      await db.update(users)
+        .set({
+          name: data.name,
+          email: data.email,
+          role: data.role,
+          avatar: avatarToUse
+        })
+        .where(eq(users.id, data.id));
+      
+      // Fetch the updated user
+      const updatedUser = await db.query.users.findFirst({
+        where: eq(users.id, data.id)
+      });
+      
+      // Revalidate the path
+      revalidatePath('/');
+      
+      return { success: true, user: updatedUser };
+    }
   } catch (error) {
     console.error("Error updating user:", error);
     
@@ -767,5 +878,42 @@ export async function getUserCount() {
   } catch (error) {
     console.error('Error getting user count:', error);
     return 0;
+  }
+}
+
+/**
+ * Get task counts for all users
+ */
+export async function getUserTaskCounts() {
+  try {
+    // First get all tasks that have assigneeId
+    const assignedTasks = await db.query.tasks.findMany({
+      where: sql`${tasks.assigneeId} IS NOT NULL`
+    });
+    
+    // Count tasks per user
+    const taskCounts: Record<number, number> = {};
+    
+    // Initialize counts
+    const allUsers = await db.query.users.findMany();
+    allUsers.forEach(user => {
+      taskCounts[user.id] = 0;
+    });
+    
+    // Count tasks for each user
+    assignedTasks.forEach(task => {
+      if (task.assigneeId !== null) {
+        if (taskCounts[task.assigneeId] === undefined) {
+          taskCounts[task.assigneeId] = 1;
+        } else {
+          taskCounts[task.assigneeId]++;
+        }
+      }
+    });
+    
+    return { success: true, taskCounts };
+  } catch (error) {
+    console.error('Error getting user task counts:', error);
+    return { success: false, error: "Failed to fetch task counts" };
   }
 } 

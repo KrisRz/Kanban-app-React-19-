@@ -25,6 +25,17 @@ import { createTaskAction, updateTaskAction, deleteTaskAction } from "@/lib/acti
 import { useRouter } from "next/navigation"
 import { useToast } from "@/components/ui/use-toast"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { Loader2, Trash2, ClipboardCheck } from "lucide-react"
 
 interface TaskDialogProps {
   open: boolean
@@ -32,6 +43,7 @@ interface TaskDialogProps {
   task?: Task | null
   mode: "create" | "edit"
   teamMembers: User[]
+  onTaskUpdate?: (task: Task) => void
 }
 
 type FieldErrors = Record<string, string>
@@ -42,6 +54,7 @@ export function TaskDialog({
   task,
   mode,
   teamMembers,
+  onTaskUpdate,
 }: TaskDialogProps) {
   const [title, setTitle] = useState<string>("")
   const [description, setDescription] = useState<string>("")
@@ -49,6 +62,8 @@ export function TaskDialog({
   const [assigneeId, setAssigneeId] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState<boolean>(false)
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
+  const [showDeleteDialog, setShowDeleteDialog] = useState<boolean>(false)
+  const [showCannotDeleteDialog, setShowCannotDeleteDialog] = useState<boolean>(false)
   const router = useRouter()
   const { toast } = useToast()
 
@@ -86,8 +101,10 @@ export function TaskDialog({
             title: "Task created",
             description: "Your task has been created successfully."
           })
+          if (onTaskUpdate && result.task) {
+            onTaskUpdate(result.task as Task)
+          }
           onOpenChange(false)
-          router.refresh()
         } else {
           if (result.fieldErrors) {
             setFieldErrors(result.fieldErrors)
@@ -112,8 +129,10 @@ export function TaskDialog({
             title: "Task updated",
             description: "Your task has been updated successfully."
           })
+          if (onTaskUpdate && result.task) {
+            onTaskUpdate(result.task as Task)
+          }
           onOpenChange(false)
-          router.refresh()
         } else {
           if (result.fieldErrors) {
             setFieldErrors(result.fieldErrors)
@@ -137,6 +156,17 @@ export function TaskDialog({
     }
   }
 
+  async function handleDeleteClick() {
+    if (!task) return;
+    
+    // Check if task has assignee before allowing deletion
+    if (assigneeId) {
+      setShowCannotDeleteDialog(true);
+    } else {
+      setShowDeleteDialog(true);
+    }
+  }
+
   async function handleDelete() {
     if (!task) return
     
@@ -149,8 +179,17 @@ export function TaskDialog({
           title: "Task deleted",
           description: "Your task has been deleted successfully."
         })
+        
+        // Notify parent component about the deletion
+        if (onTaskUpdate) {
+          // Pass a special task object with a _deleted flag to signal deletion
+          onTaskUpdate({
+            ...task,
+            _deleted: true
+          } as Task);
+        }
+        
         onOpenChange(false)
-        router.refresh()
       } else {
         toast({
           title: "Error",
@@ -167,6 +206,7 @@ export function TaskDialog({
       })
     } finally {
       setIsLoading(false)
+      setShowDeleteDialog(false)
     }
   }
 
@@ -263,9 +303,9 @@ export function TaskDialog({
               <div className="col-span-3 space-y-1">
                 <Select
                   value={assigneeId ? assigneeId.toString() : "none"}
-                  onValueChange={(value) =>
-                    setAssigneeId(value !== "none" ? parseInt(value) : null)
-                  }
+                  onValueChange={(value) => {
+                    setAssigneeId(value !== "none" ? parseInt(value) : null);
+                  }}
                 >
                   <SelectTrigger 
                     id="assignee" 
@@ -308,10 +348,20 @@ export function TaskDialog({
               <Button 
                 type="button" 
                 variant="destructive" 
-                onClick={handleDelete}
+                onClick={handleDeleteClick}
                 disabled={isLoading}
               >
-                Delete
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete
+                  </>
+                )}
               </Button>
             )}
             <div className="flex space-x-2">
@@ -330,6 +380,48 @@ export function TaskDialog({
           </DialogFooter>
         </form>
       </DialogContent>
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the task
+              and remove its data from the server.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDelete} 
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
+      <AlertDialog open={showCannotDeleteDialog} onOpenChange={setShowCannotDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center">
+              <ClipboardCheck className="mr-2 h-5 w-5" />
+              Cannot Delete Task
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This task has a user assigned to it and cannot be deleted.
+              <span className="block mt-2 text-sm font-medium">
+                Please unassign the user first before deleting this task.
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setShowCannotDeleteDialog(false)}>
+              Close
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   )
 } 

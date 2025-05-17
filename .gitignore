@@ -16,6 +16,7 @@
 # next.js
 /.next/
 /out/
+.next-cache/
 
 # production
 /build
@@ -37,6 +38,7 @@ yarn-error.log*
 .env.development
 .env.test
 .env.production
+run-dev.sh
 
 # vercel
 .vercel
@@ -64,3 +66,19 @@ drizzle/.snapshots/
 
 # Docker volumes
 data-volume/
+
+# Logs
+logs
+*.log
+
+# Caches
+.turbo
+.cache/
+
+# Render 
+.render-buildpacks/
+
+# PWA
+**/public/workbox-*.js
+**/public/sw.js
+**/public/service-worker.js
