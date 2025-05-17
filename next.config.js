@@ -2,7 +2,6 @@
 const nextConfig = {
   reactStrictMode: true,
   images: {
-    domains: ['randomuser.me'], // For the team member avatars
     remotePatterns: [
       {
         protocol: 'https',

@@ -1,16 +1,34 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
-import { tasks } from '@/db/schema';
+import { tasks, users, columns } from '@/db/schema';
 import { eq } from 'drizzle-orm';
+import { InferSelectModel } from 'drizzle-orm';
+
+// Define types based on the schema
+type User = InferSelectModel<typeof users>;
+type Column = InferSelectModel<typeof columns>;
+type Task = InferSelectModel<typeof tasks>;
 
 export async function GET() {
   try {
-    const data = await db.query.tasks.findMany({
-      with: {
-        assignee: true,
-        column: true
-      }
-    });
+    // Fetch tasks without relations
+    const allTasks = await db.select().from(tasks);
+    
+    // Fetch all users and columns
+    const allUsers = await db.select().from(users);
+    const allColumns = await db.select().from(columns);
+    
+    // Map users and columns by ID for quick lookup
+    const usersById = Object.fromEntries(allUsers.map((user: User) => [user.id, user]));
+    const columnsById = Object.fromEntries(allColumns.map((column: Column) => [column.id, column]));
+    
+    // Join the data manually
+    const data = allTasks.map((task: Task) => ({
+      ...task,
+      assignee: task.assigneeId ? usersById[task.assigneeId] : null,
+      column: columnsById[task.columnId]
+    }));
+    
     return NextResponse.json(data);
   } catch (error) {
     console.error('Failed to fetch tasks:', error);
