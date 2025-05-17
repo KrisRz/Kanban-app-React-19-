@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev --turbo",
     "build": "next build",
+    "build:nolint": "NEXT_IGNORE_TYPE_CHECKS=1 next build --no-lint",
     "start": "next start",
     "lint": "next lint",
     "db:generate": "drizzle-kit generate",

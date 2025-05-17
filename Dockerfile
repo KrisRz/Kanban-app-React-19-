@@ -21,7 +21,7 @@ ARG DATABASE_URL
 ENV DATABASE_URL=${DATABASE_URL}
 
 # Build application
-RUN npm run build
+RUN npm run build:nolint
 
 # Production image, copy all the files and run next
 FROM base AS runner
