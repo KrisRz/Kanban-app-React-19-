@@ -1,30 +1,11 @@
 import { KanbanBoard } from "@/components/kanban-board-client"
 import { getColumns, getTasks, getTeamMembers } from "@/lib/actions"
+import { Column, User, Task } from "@/lib/types"
 
 // Define interfaces that match both the database schema and component props
-interface Column {
-  id: number;
-  name: string;
-  order: number;
-}
-
-interface User {
-  id: number;
-  name: string;
-  email: string;
-  role: string | null;
-  avatar: string | null;
-}
-
-interface Task {
-  id: number;
-  title: string;
-  description: string | null;
-  status: 'todo' | 'in-progress' | 'done';
-  assigneeId: number | null;
-  columnId: number;
-  order: number;
-  assignee?: User;
+interface ColumnData extends Column {}
+interface UserData extends User {}
+interface TaskData extends Task {
   column?: Column;
 }
 
@@ -35,13 +16,13 @@ export default async function Home() {
   const dbUsers = await getTeamMembers() || []
   
   // Map database results to component props
-  const columns: Column[] = dbColumns.map(col => ({
+  const columns: Column[] = dbColumns.map((col: any) => ({
     id: col.id,
     name: col.name,
     order: col.order
   }))
   
-  const users: User[] = dbUsers.map(user => ({
+  const users: User[] = dbUsers.map((user: any) => ({
     id: user.id,
     name: user.name,
     email: user.email,
@@ -49,7 +30,7 @@ export default async function Home() {
     avatar: user.avatar
   }))
   
-  const tasks: Task[] = dbTasks.map(task => ({
+  const tasks: TaskData[] = dbTasks.map((task: any) => ({
     id: task.id,
     title: task.title,
     description: task.description,
