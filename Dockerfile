@@ -1,4 +1,4 @@
-FROM node:18-alpine AS base
+FROM node:20-alpine AS base
 
 # Install dependencies only when needed
 FROM base AS deps
@@ -28,6 +28,9 @@ FROM base AS runner
 WORKDIR /app
 
 ENV NODE_ENV production
+# Pass through the database URL to the runtime environment
+ARG DATABASE_URL
+ENV DATABASE_URL=${DATABASE_URL}
 
 # Create system user
 RUN addgroup --system --gid 1001 nodejs
