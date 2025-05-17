@@ -9,8 +9,9 @@ import { notFound } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
 import { Task } from '@/lib/types'
 
-export default async function UserProfilePage({ params }: { params: { id: string } }) {
-  const userId = parseInt(params.id)
+export default async function UserProfilePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const userId = parseInt(id)
   
   if (isNaN(userId)) {
     notFound()

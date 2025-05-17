@@ -10,8 +10,9 @@ import { Badge } from '@/components/ui/badge'
 import { Task } from '@/lib/types'
 import SimpleTaskCard from '@/components/simple-task-card'
 
-export default async function UserDashboardPage({ params }: { params: { id: string } }) {
-  const userId = parseInt(params.id)
+export default async function UserDashboardPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const userId = parseInt(id)
   
   if (isNaN(userId)) {
     notFound()
