@@ -56,6 +56,13 @@ async function runDataImport() {
       } else {
         console.log('Tables do not exist despite flag file. Will re-import.');
         // Continue with import
+        try {
+          // Remove the flag file to allow reimport
+          fs.unlinkSync(IMPORT_FLAG_FILE);
+          console.log('Removed stale import flag file');
+        } catch (err) {
+          console.error('Error removing flag file:', err);
+        }
       }
     }
     
@@ -76,29 +83,22 @@ async function runDataImport() {
     // Now try to import the data
     try {
       console.log('Importing data from JSON...');
-      // Import the data asynchronously
-      const importModule = require('./import-data');
-      // Wait for import to complete
-      await new Promise((resolve) => {
-        // Set a timeout in case the import hangs
-        const timeoutId = setTimeout(() => {
-          console.error('Import timed out after 30 seconds');
-          resolve(false);
-        }, 30000);
-        
-        // Listen for the process to exit
-        process.once('beforeExit', () => {
-          clearTimeout(timeoutId);
-          resolve(true);
-        });
-      });
+      // Import the data directly and await it
+      const importData = require('./import-data');
+      const importResult = await importData();
       
-      // Create the flag file only after successful schema creation and import
-      try {
-        fs.writeFileSync(IMPORT_FLAG_FILE, new Date().toISOString());
-        console.log('Created import flag file at', IMPORT_FLAG_FILE);
-      } catch (flagError) {
-        console.error('Could not create flag file, continuing anyway:', flagError.message);
+      if (importResult) {
+        console.log('Data import completed successfully');
+        
+        // Create the flag file only after successful schema creation and import
+        try {
+          fs.writeFileSync(IMPORT_FLAG_FILE, new Date().toISOString());
+          console.log('Created import flag file at', IMPORT_FLAG_FILE);
+        } catch (flagError) {
+          console.error('Could not create flag file, continuing anyway:', flagError.message);
+        }
+      } else {
+        console.error('Data import failed');
       }
       
       // Verify tables exist after import
@@ -128,25 +128,41 @@ async function verifyTablesExist() {
     
     const client = await pool.connect();
     try {
-      // Check if users table exists and has rows
-      const result = await client.query(`
-        SELECT EXISTS (
-          SELECT 1 FROM information_schema.tables 
-          WHERE table_schema = 'public' 
-          AND table_name = 'users'
-        ) AS exists
-      `);
+      // Check if all required tables exist
+      const tables = ['users', 'columns', 'tasks'];
+      let allTablesExist = true;
       
-      const tablesExist = result.rows[0].exists;
-      console.log('Tables exist:', tablesExist);
+      for (const table of tables) {
+        const result = await client.query(`
+          SELECT EXISTS (
+            SELECT 1 FROM information_schema.tables 
+            WHERE table_schema = 'public' 
+            AND table_name = '${table}'
+          ) AS exists
+        `);
+        
+        const tableExists = result.rows[0].exists;
+        console.log(`Table ${table} exists:`, tableExists);
+        
+        if (!tableExists) {
+          allTablesExist = false;
+          break;
+        }
+      }
       
-      if (tablesExist) {
+      if (allTablesExist) {
         // If tables exist, check if they have data
         const userCount = await client.query('SELECT COUNT(*) FROM users');
         console.log('User count:', userCount.rows[0].count);
+        
+        const columnCount = await client.query('SELECT COUNT(*) FROM columns');
+        console.log('Column count:', columnCount.rows[0].count);
+        
+        const taskCount = await client.query('SELECT COUNT(*) FROM tasks');
+        console.log('Task count:', taskCount.rows[0].count);
       }
       
-      return tablesExist;
+      return allTablesExist;
     } finally {
       client.release();
       await pool.end();

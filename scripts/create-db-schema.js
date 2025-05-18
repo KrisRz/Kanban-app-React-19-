@@ -1,126 +1,122 @@
-// Script to create the database schema in PostgreSQL
-const { Pool } = require('pg');
-const fs = require('fs');
-const path = require('path');
+#!/usr/bin/env node
 
-// Create a new pool using the environment variable
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false // Required for Render PostgreSQL
-  }
-});
+/**
+ * Create PostgreSQL database schema
+ */
+
+const { Pool } = require('pg');
 
 async function createSchema() {
-  console.log('Creating database schema in PostgreSQL...');
-  console.log('Database URL is set:', !!process.env.DATABASE_URL);
+  // Check if DATABASE_URL environment variable is set
+  if (!process.env.DATABASE_URL) {
+    console.error('DATABASE_URL environment variable is not set');
+    return false;
+  }
+  
+  console.log('Creating database schema with CONNECTION URL:', process.env.DATABASE_URL.substring(0, 25) + '...');
+  
+  const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: {
+      rejectUnauthorized: false // Required for Render PostgreSQL
+    }
+  });
   
   let client;
   try {
-    // Get a client from the pool
     client = await pool.connect();
-    console.log('Connected to PostgreSQL database successfully');
+    console.log('Successfully connected to PostgreSQL database');
     
-    // Create schema
-    console.log('Creating tables...');
+    // Create users table
+    console.log('Creating users table if it does not exist...');
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id VARCHAR(255) PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log('Users table created successfully');
     
-    try {
-      // Create users table
-      console.log('Creating users table...');
-      await client.query(`
-        CREATE TABLE IF NOT EXISTS users (
-          id SERIAL PRIMARY KEY,
-          name VARCHAR(255) NOT NULL,
-          email VARCHAR(255) UNIQUE NOT NULL,
-          role VARCHAR(255),
-          avatar TEXT,
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP WITH TIME ZONE
-        )
-      `);
-      console.log('Created users table successfully');
-      
-      // Create columns table
-      console.log('Creating columns table...');
-      await client.query(`
-        CREATE TABLE IF NOT EXISTS columns (
-          id SERIAL PRIMARY KEY,
-          name VARCHAR(255) NOT NULL,
-          "order" INTEGER NOT NULL,
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
-      console.log('Created columns table successfully');
-      
-      // Create tasks table
-      console.log('Creating tasks table...');
-      await client.query(`
-        CREATE TABLE IF NOT EXISTS tasks (
-          id SERIAL PRIMARY KEY,
-          title VARCHAR(255) NOT NULL,
-          description TEXT,
-          status VARCHAR(50) NOT NULL,
-          "assigneeId" INTEGER REFERENCES users(id),
-          "columnId" INTEGER REFERENCES columns(id),
-          "order" INTEGER NOT NULL,
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP WITH TIME ZONE
-        )
-      `);
-      console.log('Created tasks table successfully');
-      
-      console.log('Schema creation complete!');
-      
-      // Verify tables exist
-      console.log('Verifying tables exist...');
-      const tables = await client.query(`
-        SELECT table_name 
-        FROM information_schema.tables 
-        WHERE table_schema = 'public'
-      `);
-      console.log('Tables in database:', tables.rows.map(row => row.table_name).join(', '));
-      
-      return true;
-    } catch (queryError) {
-      console.error('Error executing SQL:', queryError);
-      return false;
-    }
+    // Create columns table
+    console.log('Creating columns table if it does not exist...');
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS columns (
+        id VARCHAR(255) PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        position INTEGER NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log('Columns table created successfully');
+    
+    // Create tasks table
+    console.log('Creating tasks table if it does not exist...');
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS tasks (
+        id VARCHAR(255) PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        column_id VARCHAR(255) REFERENCES columns(id) ON DELETE CASCADE,
+        position INTEGER NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log('Tasks table created successfully');
+    
+    // List all tables to verify
+    console.log('Verifying tables created...');
+    const tablesResult = await client.query(`
+      SELECT table_name 
+      FROM information_schema.tables 
+      WHERE table_schema = 'public'
+    `);
+    
+    console.log('Tables in database:', tablesResult.rows.map(row => row.table_name).join(', '));
+    
+    // Return success
+    return true;
   } catch (error) {
-    console.error('Error creating schema:', error);
+    console.error('Error creating database schema:', error.message);
+    console.error('Full error details:', JSON.stringify(error, null, 2));
     return false;
   } finally {
     if (client) {
-      console.log('Releasing database client');
       client.release();
+      console.log('Database client released');
     }
     
-    // Close the pool
     try {
-      console.log('Closing database pool');
       await pool.end();
-      console.log('Database pool closed');
+      console.log('Database connection pool ended');
     } catch (endError) {
-      console.error('Error closing pool:', endError);
+      console.error('Error ending pool:', endError.message);
     }
   }
 }
 
-// Export the createSchema function for use in import-data.js
-module.exports = createSchema;
-
-// If this script is run directly, execute createSchema
+// If the script is run directly
 if (require.main === module) {
-  createSchema().then(success => {
-    if (success) {
-      console.log('Schema created successfully when run directly');
-      process.exit(0);
-    } else {
-      console.error('Failed to create schema when run directly');
+  createSchema()
+    .then(success => {
+      if (success) {
+        console.log('Database schema created successfully');
+        process.exit(0);
+      } else {
+        console.error('Failed to create database schema');
+        process.exit(1);
+      }
+    })
+    .catch(error => {
+      console.error('Unhandled error in schema creation:', error);
       process.exit(1);
-    }
-  }).catch(err => {
-    console.error('Schema creation failed with error:', err);
-    process.exit(1);
-  });
+    });
+} else {
+  // Export the function to be used in other modules
+  module.exports = createSchema;
 } 

@@ -1,187 +1,198 @@
-// Script to import data from JSON files to PostgreSQL database
+#!/usr/bin/env node
+
+/**
+ * Import data from JSON files to PostgreSQL database
+ */
+
 const fs = require('fs');
 const path = require('path');
-const { Pool } = require('pg');
-const createSchema = require('./create-db-schema');
 
 // Flag file to check if data import has been completed - use /tmp directory which is writable
 const IMPORT_FLAG_FILE = path.join('/tmp', '.import_completed');
+const DATA_DIR = path.join(__dirname, '..', 'data');
 
-// Create a new pool using the environment variable
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false // Required for Render PostgreSQL
-  }
-});
-
+// Main function to import data
 async function importData() {
-  console.log('Importing data into PostgreSQL database...');
+  console.log('Import data script running...');
+  console.log('Data directory:', DATA_DIR);
   
-  // Check if import has already been done
-  if (fs.existsSync(IMPORT_FLAG_FILE)) {
-    console.log('Data already imported (flag file exists). Skipping import.');
-    return true;
-  }
-  
-  let client;
   try {
-    // Create schema if not already created
-    console.log('Creating database schema if needed...');
-    const schemaResult = await createSchema();
-    if (!schemaResult) {
-      console.error('Schema creation failed. Cannot import data.');
-      return false;
-    }
+    // Check if files exist in the data directory
+    const files = fs.readdirSync(DATA_DIR);
+    console.log('Found files in data directory:', files);
     
-    // Get a client from the pool
-    client = await pool.connect();
-    console.log('Connected to PostgreSQL database');
+    // Connect to the database
+    const { Pool } = require('pg');
+    const pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: {
+        rejectUnauthorized: false
+      }
+    });
     
-    // Read the exported data from JSON files
-    const dataDir = path.join(process.cwd(), 'data');
-    console.log('Data directory:', dataDir);
-    
-    // List files in the data directory to verify they exist
-    try {
-      const files = fs.readdirSync(dataDir);
-      console.log('Files in data directory:', files.join(', '));
-    } catch (err) {
-      console.error('Error reading data directory:', err);
-      return false;
-    }
-    
-    console.log('Reading exported data files...');
-    
-    let usersData, tasksData, columnsData;
+    const client = await pool.connect();
+    console.log('Connected to PostgreSQL database to import data');
     
     try {
-      usersData = JSON.parse(
-        fs.readFileSync(path.join(dataDir, 'users.json'), 'utf-8')
-      );
+      // Import users
+      await importUsers(client);
       
-      tasksData = JSON.parse(
-        fs.readFileSync(path.join(dataDir, 'tasks.json'), 'utf-8')
-      );
+      // Import columns
+      await importColumns(client);
       
-      columnsData = JSON.parse(
-        fs.readFileSync(path.join(dataDir, 'columns.json'), 'utf-8')
-      );
+      // Import tasks
+      await importTasks(client);
       
-      console.log(`Found: ${usersData.length} users, ${tasksData.length} tasks, ${columnsData.length} columns`);
-    } catch (readError) {
-      console.error('Error reading data files:', readError);
+      console.log('All data imported successfully');
+      
+      return true;
+    } catch (error) {
+      console.error('Error importing data:', error);
       return false;
-    }
-    
-    // Check if columns already exist
-    try {
-      const columnsExist = await client.query('SELECT COUNT(*) FROM columns');
-      if (columnsExist.rows[0].count > 0) {
-        console.log('Columns already exist in the database. Skipping column import.');
-      } else {
-        // Import columns
-        console.log('Importing columns...');
-        for (const column of columnsData) {
-          await client.query(
-            'INSERT INTO columns (id, name, "order") VALUES ($1, $2, $3)',
-            [column.id, column.name, column.order]
-          );
-        }
-        console.log(`Imported ${columnsData.length} columns`);
-      }
-    } catch (columnError) {
-      console.error('Error importing columns:', columnError);
-      return false;
-    }
-    
-    // Check if users already exist
-    try {
-      const usersExist = await client.query('SELECT COUNT(*) FROM users');
-      if (usersExist.rows[0].count > 0) {
-        console.log('Users already exist in the database. Skipping user import.');
-      } else {
-        // Import users
-        console.log('Importing users...');
-        for (const user of usersData) {
-          await client.query(
-            'INSERT INTO users (id, name, email, role, avatar) VALUES ($1, $2, $3, $4, $5)',
-            [user.id, user.name, user.email, user.role, user.avatar]
-          );
-        }
-        console.log(`Imported ${usersData.length} users`);
-      }
-    } catch (userError) {
-      console.error('Error importing users:', userError);
-      return false;
-    }
-    
-    // Check if tasks already exist
-    try {
-      const tasksExist = await client.query('SELECT COUNT(*) FROM tasks');
-      if (tasksExist.rows[0].count > 0) {
-        console.log('Tasks already exist in the database. Skipping task import.');
-      } else {
-        // Import tasks
-        console.log('Importing tasks...');
-        for (const task of tasksData) {
-          await client.query(
-            'INSERT INTO tasks (id, title, description, status, "assigneeId", "columnId", "order") VALUES ($1, $2, $3, $4, $5, $6, $7)',
-            [task.id, task.title, task.description, task.status, task.assignee_id, task.column_id, task.order]
-          );
-        }
-        console.log(`Imported ${tasksData.length} tasks`);
-      }
-    } catch (taskError) {
-      console.error('Error importing tasks:', taskError);
-      return false;
-    }
-    
-    console.log('Data import complete!');
-    
-    // Create the flag file to indicate import has been completed
-    try {
-      if (!fs.existsSync(IMPORT_FLAG_FILE)) {
-        fs.writeFileSync(IMPORT_FLAG_FILE, new Date().toISOString());
-        console.log('Created import flag file at', IMPORT_FLAG_FILE, 'to prevent future imports.');
-      }
-    } catch (flagError) {
-      console.error('Could not create flag file:', flagError.message);
-    }
-    
-    return true;
-  } catch (error) {
-    console.error('Error importing data:', error);
-    return false;
-  } finally {
-    if (client) {
+    } finally {
       client.release();
-    }
-    
-    // Close the pool
-    try {
       await pool.end();
-      console.log('Database connection closed');
-    } catch (endError) {
-      console.error('Error closing pool:', endError);
     }
+  } catch (error) {
+    console.error('Failed to import data:', error);
+    return false;
   }
 }
 
-// If this script is run directly, execute importData
-if (require.main === module) {
-  importData().then((success) => {
-    if (success) {
-      console.log('Import script completed successfully');
-    } else {
-      console.error('Import script completed with errors');
+// Function to import users
+async function importUsers(client) {
+  try {
+    // Check for existing users
+    const userCount = await client.query('SELECT COUNT(*) FROM users');
+    console.log('Existing user count:', userCount.rows[0].count);
+    
+    if (parseInt(userCount.rows[0].count) > 0) {
+      console.log('Users already imported, skipping');
+      return;
     }
-    process.exit(0);
-  }).catch(err => {
-    console.error('Import script failed with unhandled error:', err);
-    process.exit(1);
-  });
-} else {
-  // If required as a module, export the function
-  module.exports = importData;
-} 
+    
+    const usersFile = path.join(DATA_DIR, 'users.json');
+    console.log('Reading users from:', usersFile);
+    
+    if (!fs.existsSync(usersFile)) {
+      console.error('Users file not found:', usersFile);
+      return;
+    }
+    
+    const usersData = fs.readFileSync(usersFile, 'utf8');
+    const users = JSON.parse(usersData);
+    
+    console.log(`Importing ${users.length} users to database...`);
+    
+    for (const user of users) {
+      await client.query(
+        'INSERT INTO users(id, name, email, password, created_at, updated_at) VALUES($1, $2, $3, $4, $5, $6)',
+        [user.id, user.name, user.email, user.password, new Date(), new Date()]
+      );
+    }
+    
+    console.log('Users imported successfully');
+  } catch (error) {
+    console.error('Error importing users:', error);
+    throw error;
+  }
+}
+
+// Function to import columns
+async function importColumns(client) {
+  try {
+    // Check for existing columns
+    const columnCount = await client.query('SELECT COUNT(*) FROM columns');
+    console.log('Existing column count:', columnCount.rows[0].count);
+    
+    if (parseInt(columnCount.rows[0].count) > 0) {
+      console.log('Columns already imported, skipping');
+      return;
+    }
+    
+    const columnsFile = path.join(DATA_DIR, 'columns.json');
+    console.log('Reading columns from:', columnsFile);
+    
+    if (!fs.existsSync(columnsFile)) {
+      console.error('Columns file not found:', columnsFile);
+      return;
+    }
+    
+    const columnsData = fs.readFileSync(columnsFile, 'utf8');
+    const columns = JSON.parse(columnsData);
+    
+    console.log(`Importing ${columns.length} columns to database...`);
+    
+    for (const column of columns) {
+      await client.query(
+        'INSERT INTO columns(id, title, position, created_at, updated_at) VALUES($1, $2, $3, $4, $5)',
+        [column.id, column.title, column.position, new Date(), new Date()]
+      );
+    }
+    
+    console.log('Columns imported successfully');
+  } catch (error) {
+    console.error('Error importing columns:', error);
+    throw error;
+  }
+}
+
+// Function to import tasks
+async function importTasks(client) {
+  try {
+    // Check for existing tasks
+    const taskCount = await client.query('SELECT COUNT(*) FROM tasks');
+    console.log('Existing task count:', taskCount.rows[0].count);
+    
+    if (parseInt(taskCount.rows[0].count) > 0) {
+      console.log('Tasks already imported, skipping');
+      return;
+    }
+    
+    const tasksFile = path.join(DATA_DIR, 'tasks.json');
+    console.log('Reading tasks from:', tasksFile);
+    
+    if (!fs.existsSync(tasksFile)) {
+      console.error('Tasks file not found:', tasksFile);
+      return;
+    }
+    
+    const tasksData = fs.readFileSync(tasksFile, 'utf8');
+    const tasks = JSON.parse(tasksData);
+    
+    console.log(`Importing ${tasks.length} tasks to database...`);
+    
+    for (const task of tasks) {
+      await client.query(
+        'INSERT INTO tasks(id, title, description, column_id, position, created_at, updated_at) VALUES($1, $2, $3, $4, $5, $6, $7)',
+        [task.id, task.title, task.description || null, task.column_id, task.position, new Date(), new Date()]
+      );
+    }
+    
+    console.log('Tasks imported successfully');
+  } catch (error) {
+    console.error('Error importing tasks:', error);
+    throw error;
+  }
+}
+
+// If this script is run directly, run the import function
+if (require.main === module) {
+  importData()
+    .then(success => {
+      if (success) {
+        console.log('Data import completed successfully');
+        process.exit(0);
+      } else {
+        console.error('Data import failed');
+        process.exit(1);
+      }
+    })
+    .catch(error => {
+      console.error('Error in import process:', error);
+      process.exit(1);
+    });
+}
+
+// Export the function for use in other modules
+module.exports = importData; 
