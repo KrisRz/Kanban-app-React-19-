@@ -19,40 +19,7 @@ import {
 import { SortableContext, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { TaskCard } from './task-card'
 import { TaskDialog } from './task-dialog'
-import { v4 as uuidv4 } from 'uuid'
-
-// Define TeamMember interface here instead of importing it
-interface TeamMember {
-  id: string;
-  name: string;
-  avatar?: string;
-  role?: string;
-}
-
-interface Task {
-  id: string
-  title: string
-  description: string
-  status: 'todo' | 'in-progress' | 'done'
-  assignee?: {
-    id: string
-    name: string
-    avatar?: string
-    role?: string
-  }
-  column_id?: string
-  order?: number
-  created_at?: string
-  updated_at?: string
-}
-
-interface Column {
-  id: string
-  name: string
-  order: number
-  created_at?: string
-  updated_at?: string
-}
+import { Task, Column, User } from '@/lib/types'
 
 function DroppableColumn({ id, title, children }: { id: string, title: string, children: React.ReactNode }) {
   const { setNodeRef } = useDroppable({
@@ -76,7 +43,7 @@ function DroppableColumn({ id, title, children }: { id: string, title: string, c
 export function KanbanBoard() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [columns, setColumns] = useState<Column[]>([])
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
+  const [teamMembers, setTeamMembers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTask, setActiveTask] = useState<Task | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -104,14 +71,7 @@ export function KanbanBoard() {
         const teamMembersData = await teamMembersRes.json()
         
         if (teamMembersRes.ok) {
-          // Convert to expected format
-          const processedTeamMembers = teamMembersData.map((user: any) => ({
-            id: user.id.toString(),
-            name: user.name,
-            avatar: user.avatar,
-            role: user.role
-          }))
-          setTeamMembers(processedTeamMembers)
+          setTeamMembers(teamMembersData)
         } else {
           console.error('Failed to fetch team members:', teamMembersData)
         }
@@ -121,36 +81,7 @@ export function KanbanBoard() {
         const tasksData = await tasksRes.json()
         
         if (tasksRes.ok) {
-          // Process task data to match our component's expected format
-          const processedTasks = tasksData.map((task: any) => {
-            const taskStatus = task.status || 'todo'
-            
-            // Find user if assignee_id exists
-            let assignee
-            if (task.assignee_id) {
-              const user = teamMembersData.find((m: any) => m.id === task.assignee_id)
-              if (user) {
-                assignee = {
-                  id: user.id.toString(),
-                  name: user.name,
-                  avatar: user.avatar,
-                  role: user.role
-                }
-              }
-            }
-            
-            return {
-              id: task.id,
-              title: task.title,
-              description: task.description || '',
-              status: taskStatus,
-              assignee,
-              column_id: task.column_id,
-              order: task.order
-            }
-          })
-          
-          setTasks(processedTasks)
+          setTasks(tasksData)
         } else {
           console.error('Failed to fetch tasks:', tasksData)
         }
@@ -188,7 +119,7 @@ export function KanbanBoard() {
 
   function handleDragStart(event: DragStartEvent) {
     const { active } = event
-    const activeTaskId = active.id as string
+    const activeTaskId = active.id as number
     const task = tasks.find(t => t.id === activeTaskId) || null
     setActiveTask(task)
   }
@@ -230,13 +161,10 @@ export function KanbanBoard() {
             updateTaskOnServer({
               ...taskToUpdate,
               status: newStatus,
-              column_id: targetColumn.id
+              columnId: targetColumn.id
             })
           }
         }
-      } else {
-        // Task was dropped on another task - we could implement reordering here
-        // For now we're just handling column drops
       }
     }
     
@@ -255,8 +183,8 @@ export function KanbanBoard() {
           title: task.title,
           description: task.description,
           status: task.status,
-          assigneeId: task.assignee?.id,
-          columnId: task.column_id,
+          assigneeId: task.assigneeId,
+          columnId: task.columnId,
           order: task.order
         }),
       })
@@ -270,33 +198,34 @@ export function KanbanBoard() {
   }
 
   // Function to update task assignee
-  function updateTaskAssignee(taskId: string, memberId: string | null) {
-    const updatedTasks = tasks.map(task => {
-      if (task.id === taskId) {
-        let updatedTask: Task
-        
-        if (memberId === null || memberId === "unassigned") {
-          // Remove assignee
-          const { assignee, ...taskWithoutAssignee } = task
-          updatedTask = taskWithoutAssignee as Task
-        } else {
-          // Update assignee
-          const member = teamMembers.find(m => m.id === memberId)
-          updatedTask = {
-            ...task,
-            assignee: member
-          }
-        }
-        
-        // Update task on server
-        updateTaskOnServer(updatedTask)
-        
-        return updatedTask
-      }
-      return task
-    })
+  function updateTaskAssignee(taskId: number, memberId: number | null) {
+    const task = tasks.find(t => t.id === taskId)
+    if (!task) return
     
-    setTasks(updatedTasks)
+    // Find the member
+    const member = memberId ? teamMembers.find(m => m.id === memberId) : null
+    
+    // Create a copy of the task with updated assignee
+    let updatedTask: Task
+    if (member) {
+      updatedTask = {
+        ...task,
+        assigneeId: member.id,
+        assignee: member
+      }
+    } else {
+      updatedTask = {
+        ...task,
+        assigneeId: null,
+        assignee: undefined
+      }
+    }
+    
+    // Update tasks state
+    setTasks(tasks.map(t => t.id === taskId ? updatedTask : t))
+    
+    // Also update on the server
+    updateTaskOnServer(updatedTask)
   }
 
   // Function to handle opening the dialog for creating a new task
@@ -335,7 +264,7 @@ export function KanbanBoard() {
             title: taskData.title,
             description: taskData.description,
             status: taskData.status,
-            assigneeId: taskData.assignee?.id,
+            assigneeId: taskData.assigneeId,
             columnId: columnForStatus?.id,
             order: taskData.status === 'todo' 
               ? todoTasks.length + 1 
@@ -347,12 +276,7 @@ export function KanbanBoard() {
         
         if (response.ok) {
           const newTask = await response.json()
-          setTasks([...tasks, {
-            ...taskData,
-            id: newTask.id,
-            column_id: newTask.column_id,
-            order: newTask.order
-          }])
+          setTasks([...tasks, newTask])
         } else {
           console.error('Failed to create task:', await response.json())
         }
@@ -379,7 +303,7 @@ export function KanbanBoard() {
   }
 
   // Function to handle deleting a task
-  async function handleDeleteTask(taskId: string) {
+  async function handleDeleteTask(taskId: number) {
     try {
       const response = await fetch(`/api/tasks/${taskId}`, {
         method: 'DELETE',
@@ -430,8 +354,10 @@ export function KanbanBoard() {
                   <TaskCard
                     key={task.id}
                     task={task}
+                    teamMembers={teamMembers}
                     onAssigneeChange={updateTaskAssignee}
                     onEdit={() => handleEditTask(task)}
+                    isDragging={false}
                   />
                 ))
               )}
@@ -447,8 +373,10 @@ export function KanbanBoard() {
                   <TaskCard
                     key={task.id}
                     task={task}
+                    teamMembers={teamMembers}
                     onAssigneeChange={updateTaskAssignee}
                     onEdit={() => handleEditTask(task)}
+                    isDragging={false}
                   />
                 ))
               )}
@@ -464,8 +392,10 @@ export function KanbanBoard() {
                   <TaskCard
                     key={task.id}
                     task={task}
+                    teamMembers={teamMembers}
                     onAssigneeChange={updateTaskAssignee}
                     onEdit={() => handleEditTask(task)}
+                    isDragging={false}
                   />
                 ))
               )}
@@ -478,6 +408,7 @@ export function KanbanBoard() {
             <div className="w-[calc(100%/3-1rem)]">
               <TaskCard
                 task={activeTask}
+                teamMembers={teamMembers}
                 onAssigneeChange={updateTaskAssignee}
                 onEdit={() => {}}
                 isDragging
@@ -492,8 +423,17 @@ export function KanbanBoard() {
         onOpenChange={setDialogOpen}
         mode={dialogMode}
         task={editTask}
-        onSave={handleSaveTask}
-        onDelete={editTask ? () => handleDeleteTask(editTask.id) : undefined}
+        teamMembers={teamMembers}
+        onTaskUpdate={(task) => {
+          if ('_deleted' in task) {
+            handleDeleteTask(task.id);
+          } else if (dialogMode === 'create') {
+            setTasks([...tasks, task]);
+          } else {
+            setTasks(tasks.map(t => t.id === task.id ? task : t));
+          }
+          setDialogOpen(false);
+        }}
       />
     </div>
   )
