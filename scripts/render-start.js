@@ -26,15 +26,37 @@ function checkPgModule() {
   }
 }
 
-// Function to run the data import
-function runDataImport() {
+// Function to run the schema creation directly
+async function runSchemaCreation() {
+  console.log('Creating database schema directly...');
+  try {
+    const createSchema = require('./create-db-schema');
+    const success = await createSchema();
+    console.log('Schema creation result:', success);
+    return success;
+  } catch (error) {
+    console.error('Error creating schema directly:', error);
+    return false;
+  }
+}
+
+// Function to run the data import directly
+async function runDataImport() {
   console.log('Running data import from JSON to PostgreSQL...');
   
   try {
     // Check if import has already been done
     if (fs.existsSync(IMPORT_FLAG_FILE)) {
-      console.log('Data already imported. Skipping import.');
-      return true;
+      console.log('Import flag file exists, checking if tables actually exist...');
+      // First verify the tables actually exist before skipping
+      const tablesExist = await verifyTablesExist();
+      if (tablesExist) {
+        console.log('Tables verified to exist. Skipping import.');
+        return true;
+      } else {
+        console.log('Tables do not exist despite flag file. Will re-import.');
+        // Continue with import
+      }
     }
     
     // Check if pg module is available
@@ -43,34 +65,94 @@ function runDataImport() {
       return false;
     }
     
-    try {
-      // Create the flag file now (before import) to prevent multiple attempts
-      // in case the script is interrupted
-      fs.writeFileSync(IMPORT_FLAG_FILE, new Date().toISOString());
-      console.log('Created import flag file at', IMPORT_FLAG_FILE);
-    } catch (flagError) {
-      console.error('Could not create flag file, continuing anyway:', flagError.message);
+    // First create the schema
+    console.log('Creating database schema...');
+    const schemaCreated = await runSchemaCreation();
+    if (!schemaCreated) {
+      console.error('Failed to create schema. Aborting import.');
+      return false;
     }
     
-    // Run the import script directly
-    console.log('Importing data...');
+    // Now try to import the data
     try {
-      // Run the schema creation first
-      console.log('Creating database schema...');
-      require('./create-db-schema.js');
-      
-      // Then import the data
       console.log('Importing data from JSON...');
-      require('./import-data.js');
+      // Import the data asynchronously
+      const importModule = require('./import-data');
+      // Wait for import to complete
+      await new Promise((resolve) => {
+        // Set a timeout in case the import hangs
+        const timeoutId = setTimeout(() => {
+          console.error('Import timed out after 30 seconds');
+          resolve(false);
+        }, 30000);
+        
+        // Listen for the process to exit
+        process.once('beforeExit', () => {
+          clearTimeout(timeoutId);
+          resolve(true);
+        });
+      });
       
-      console.log('Import scripts executed successfully');
-      return true;
+      // Create the flag file only after successful schema creation and import
+      try {
+        fs.writeFileSync(IMPORT_FLAG_FILE, new Date().toISOString());
+        console.log('Created import flag file at', IMPORT_FLAG_FILE);
+      } catch (flagError) {
+        console.error('Could not create flag file, continuing anyway:', flagError.message);
+      }
+      
+      // Verify tables exist after import
+      const tablesExist = await verifyTablesExist();
+      return tablesExist;
     } catch (importError) {
       console.error('Error executing import scripts:', importError);
       return false;
     }
   } catch (error) {
     console.error('Failed to run data import:', error);
+    return false;
+  }
+}
+
+// Function to verify if tables exist
+async function verifyTablesExist() {
+  try {
+    console.log('Verifying if database tables exist...');
+    const { Pool } = require('pg');
+    const pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: {
+        rejectUnauthorized: false
+      }
+    });
+    
+    const client = await pool.connect();
+    try {
+      // Check if users table exists and has rows
+      const result = await client.query(`
+        SELECT EXISTS (
+          SELECT 1 FROM information_schema.tables 
+          WHERE table_schema = 'public' 
+          AND table_name = 'users'
+        ) AS exists
+      `);
+      
+      const tablesExist = result.rows[0].exists;
+      console.log('Tables exist:', tablesExist);
+      
+      if (tablesExist) {
+        // If tables exist, check if they have data
+        const userCount = await client.query('SELECT COUNT(*) FROM users');
+        console.log('User count:', userCount.rows[0].count);
+      }
+      
+      return tablesExist;
+    } finally {
+      client.release();
+      await pool.end();
+    }
+  } catch (error) {
+    console.error('Error verifying tables:', error);
     return false;
   }
 }
@@ -108,13 +190,13 @@ function startApp() {
 }
 
 // Main function - simplified to just start the app
-function main() {
+async function main() {
   console.log('Render startup script running...');
   console.log('DATABASE_URL is set:', !!process.env.DATABASE_URL);
   
   // Run data import before starting the app
   // Even if import fails, we still start the app
-  runDataImport();
+  await runDataImport();
   
   console.log('Starting the application...');
   
@@ -124,7 +206,11 @@ function main() {
 
 // Run the script with a failsafe
 try {
-  main();
+  main().catch(error => {
+    console.error('Unhandled error in main:', error);
+    // Still try to start the app
+    startApp();
+  });
 } catch (error) {
   console.error('Fatal error in startup script:', error);
   // Last resort - try to start the app directly
