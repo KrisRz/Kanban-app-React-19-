@@ -19,7 +19,7 @@ let db: any;
 
 if (process.env.SKIP_DB_CONNECT === 'true') {
   // More comprehensive mock implementation
-  const mockQueryResult = [];
+  const mockQueryResult: any[] = [];
   
   // Create a complete mock DB object
   db = {
@@ -61,26 +61,45 @@ if (process.env.SKIP_DB_CONNECT === 'true') {
 } else {
   if (isMySQL) {
     // MySQL connection for freesqldatabase.com
-    // Extract connection details from the connection string
-    const connectionDetails = connectionString.replace('mysql://', '').split('@');
-    const [userPass, hostPort] = connectionDetails;
-    const [user, password] = userPass.split(':');
-    const [host, portDb] = hostPort.split(':');
-    const [port, database] = portDb ? portDb.split('/') : ['3306', hostPort.split('/')[1]];
-
-    const connectionPool = mysql.createPool({
-      host,
-      user,
-      password,
-      database,
-      port: Number(port),
-      ssl: undefined, // Disable SSL by setting to undefined
-      connectTimeout: 10000,
-      connectionLimit: 5,
-    });
-    
-    // Create drizzle MySQL instance with the mode parameter
-    db = drizzleMySQL(connectionPool, { schema, mode: 'default' });
+    try {
+      // Extract connection details from the connection string
+      const connectionDetails = connectionString.replace('mysql://', '').split('@');
+      const [userPass, hostPort] = connectionDetails;
+      const [user, password] = userPass.split(':');
+      const [host, portDb] = hostPort.split(':');
+      const [port, database] = portDb ? portDb.split('/') : ['3306', hostPort.split('/')[1]];
+      
+      console.log(`Connecting to MySQL database: ${database} on host: ${host}`);
+      
+      const connectionPool = mysql.createPool({
+        host,
+        user,
+        password,
+        database,
+        port: Number(port),
+        ssl: undefined, // Disable SSL
+        connectTimeout: 20000, // Increased timeout
+        connectionLimit: 3, // Reduced connection limit to prevent overloading the server
+        waitForConnections: true,
+        queueLimit: 0,
+        enableKeepAlive: true,
+        keepAliveInitialDelay: 10000,
+      });
+      
+      // Create drizzle MySQL instance with the mode parameter
+      db = drizzleMySQL(connectionPool, { schema, mode: 'default' });
+      
+      // Test the connection
+      console.log('Testing MySQL connection...');
+      connectionPool.query('SELECT 1').then(() => {
+        console.log('MySQL connection successful');
+      }).catch(err => {
+        console.error('MySQL connection test failed:', err);
+      });
+    } catch (error) {
+      console.error('Error setting up MySQL connection:', error);
+      throw error;
+    }
   } else {
     // Postgres connection for local development
     // Connection options
