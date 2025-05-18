@@ -7,7 +7,7 @@ import mysql from 'mysql2/promise';
 import { mockUsers, mockColumns, mockTasks } from './mock-data';
 
 // For use in a Node.js environment
-const connectionString = process.env.DATABASE_URL || 'postgres://postgres:postgres@localhost:5432/kanban';
+const connectionString = (process.env.DATABASE_URL || 'postgres://postgres:postgres@localhost:5432/kanban').trim();
 
 // Determine if we should use SSL based on environment
 const isProduction = process.env.NODE_ENV === 'production';
@@ -68,7 +68,8 @@ if (process.env.SKIP_DB_CONNECT === 'true') {
       const [userPass, hostPort] = connectionDetails;
       const [user, password] = userPass.split(':');
       const [host, portDb] = hostPort.split(':');
-      const [port, database] = portDb ? portDb.split('/') : ['3306', hostPort.split('/')[1]];
+      const [port, dbWithSpaces] = portDb ? portDb.split('/') : ['3306', hostPort.split('/')[1]];
+      const database = dbWithSpaces.trim(); // Trim to handle trailing spaces
       
       console.log(`Connecting to MySQL database: ${database} on host: ${host}`);
       
