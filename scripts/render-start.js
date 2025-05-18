@@ -6,9 +6,27 @@
  * to avoid multiple connection attempts that can get the IP blocked
  */
 
-const { exec } = require('child_process');
+const { exec, execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+
+// Make sure the pg module is installed
+function ensurePgInstalled() {
+  try {
+    require('pg');
+    console.log('pg module is installed');
+    return true;
+  } catch (e) {
+    console.log('pg module is not installed, installing...');
+    try {
+      execSync('npm install pg');
+      return true;
+    } catch (err) {
+      console.error('Failed to install pg:', err);
+      return false;
+    }
+  }
+}
 
 // Flag file to check if data import has been completed
 const IMPORT_FLAG_FILE = path.join(process.cwd(), '.import_completed');
@@ -24,22 +42,12 @@ function runDataImport() {
       return;
     }
     
-    // Run the import script as a separate process
-    const importProcess = exec('node scripts/startup-import.js', (error, stdout, stderr) => {
-      if (error) {
-        console.error(`Error during import: ${error.message}`);
-        return;
-      }
-      
-      if (stderr) {
-        console.error(`Import stderr: ${stderr}`);
-      }
-      
-      console.log(`Import process completed: ${stdout}`);
-    });
+    // Make sure pg is installed
+    ensurePgInstalled();
     
-    importProcess.stdout.pipe(process.stdout);
-    importProcess.stderr.pipe(process.stderr);
+    // Run the import script directly
+    console.log('Importing data...');
+    require('./import-data.js');
   } catch (error) {
     console.error('Failed to run data import:', error);
   }
