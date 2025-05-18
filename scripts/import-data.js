@@ -86,8 +86,8 @@ async function importUsers(client) {
     
     for (const user of users) {
       await client.query(
-        'INSERT INTO users(id, name, email, password, created_at, updated_at) VALUES($1, $2, $3, $4, $5, $6)',
-        [user.id, user.name, user.email, user.password, new Date(), new Date()]
+        'INSERT INTO users(id, name, email, role, avatar, created_at, updated_at) VALUES($1, $2, $3, $4, $5, $6, $7)',
+        [user.id, user.name, user.email, user.role || 'User', user.avatar || null, new Date(), new Date()]
       );
     }
     
@@ -125,8 +125,8 @@ async function importColumns(client) {
     
     for (const column of columns) {
       await client.query(
-        'INSERT INTO columns(id, title, position, created_at, updated_at) VALUES($1, $2, $3, $4, $5)',
-        [column.id, column.title, column.position, new Date(), new Date()]
+        'INSERT INTO columns(id, name, "order", created_at, updated_at) VALUES($1, $2, $3, $4, $5)',
+        [column.id, column.name || column.title, column.order || column.position, new Date(), new Date()]
       );
     }
     
@@ -164,8 +164,18 @@ async function importTasks(client) {
     
     for (const task of tasks) {
       await client.query(
-        'INSERT INTO tasks(id, title, description, column_id, position, created_at, updated_at) VALUES($1, $2, $3, $4, $5, $6, $7)',
-        [task.id, task.title, task.description || null, task.column_id, task.position, new Date(), new Date()]
+        'INSERT INTO tasks(id, title, description, status, "assigneeId", "columnId", "order", created_at, updated_at) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+        [
+          task.id, 
+          task.title, 
+          task.description || null, 
+          task.status || null,
+          task.assignee_id || task.assigneeId || null,
+          task.column_id || task.columnId,
+          task.order || task.position,
+          new Date(), 
+          new Date()
+        ]
       );
     }
     

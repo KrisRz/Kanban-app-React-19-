@@ -34,7 +34,8 @@ async function createSchema() {
         id VARCHAR(255) PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
         email VARCHAR(255) UNIQUE NOT NULL,
-        password VARCHAR(255) NOT NULL,
+        role VARCHAR(255),
+        avatar TEXT,
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
       )
@@ -46,8 +47,8 @@ async function createSchema() {
     await client.query(`
       CREATE TABLE IF NOT EXISTS columns (
         id VARCHAR(255) PRIMARY KEY,
-        title VARCHAR(255) NOT NULL,
-        position INTEGER NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        "order" INTEGER NOT NULL,
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
       )
@@ -61,8 +62,10 @@ async function createSchema() {
         id VARCHAR(255) PRIMARY KEY,
         title VARCHAR(255) NOT NULL,
         description TEXT,
-        column_id VARCHAR(255) REFERENCES columns(id) ON DELETE CASCADE,
-        position INTEGER NOT NULL,
+        status VARCHAR(50),
+        "assigneeId" INTEGER,
+        "columnId" VARCHAR(255) REFERENCES columns(id) ON DELETE CASCADE,
+        "order" INTEGER NOT NULL,
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
       )
