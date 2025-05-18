@@ -40,11 +40,19 @@ RUN adduser --system --uid 1001 nextjs
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder /app/scripts ./scripts
+
+# Make scripts executable
+RUN chmod +x ./scripts/render-start.js
 
 USER nextjs
 
 EXPOSE 3000
 
 ENV PORT 3000
+# Add environment variable to control connection retry behavior
+ENV DB_MAX_RETRIES 1
+ENV DB_CONNECTION_TIMEOUT 10000
 
-CMD ["node", "server.js"] 
+# Use our custom startup script instead of directly running server.js
+CMD ["node", "scripts/render-start.js"] 
