@@ -29,38 +29,26 @@ export const tasks = pgTable('tasks', {
   id: serial('id').primaryKey(),
   title: text('title').notNull(),
   description: text('description'),
-  status: statusEnum('status').notNull().default('todo'),
+  status: text('status').default('todo'),
   assigneeId: integer('assignee_id').references(() => users.id),
-  columnId: integer('column_id').notNull().references(() => columns.id, { onDelete: 'cascade' }),
-  order: serial('order').notNull(),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull()
+  columnId: integer('column_id').references(() => columns.id, { onDelete: 'cascade' }).notNull(),
+  order: integer('order').default(0),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
 });
 
 // Define the users relations
 export const usersRelations = relations(users, ({ many }) => ({
-  tasks: many(tasks, {
-    fields: [users.id],
-    references: [tasks.assigneeId]
-  })
+  tasks: many(tasks)
 }));
 
 // Define the columns relations
 export const columnsRelations = relations(columns, ({ many }) => ({
-  tasks: many(tasks, {
-    fields: [columns.id],
-    references: [tasks.columnId]
-  })
+  tasks: many(tasks)
 }));
 
 // Define the tasks relations
 export const tasksRelations = relations(tasks, ({ one }) => ({
-  column: one(columns, {
-    fields: [tasks.columnId],
-    references: [columns.id]
-  }),
-  assignee: one(users, {
-    fields: [tasks.assigneeId],
-    references: [users.id]
-  })
+  assignee: one(users),
+  column: one(columns)
 })); 

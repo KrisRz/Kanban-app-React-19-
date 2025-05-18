@@ -17,28 +17,71 @@ const isMySQL = connectionString.includes('mysql://');
 // Database client and connection
 let db: any;
 
-if (isMySQL) {
-  // MySQL connection for freesqldatabase.com
-  const connectionPool = mysql.createPool({
-    uri: connectionString,
-    ssl: isProduction ? { rejectUnauthorized: false } : undefined
-  });
+if (process.env.SKIP_DB_CONNECT === 'true') {
+  // More comprehensive mock implementation
+  const mockQueryResult = [];
   
-  // Create drizzle MySQL instance with the mode parameter
-  db = drizzleMySQL(connectionPool, { schema, mode: 'default' });
-} else {
-  // Postgres connection for local development
-  // Connection options
-  const connectionOptions = {
-    max: 1,
-    ssl: isProduction ? { rejectUnauthorized: false } : false
+  // Create a complete mock DB object
+  db = {
+    select: () => ({
+      from: () => mockQueryResult,
+      where: () => mockQueryResult,
+      orderBy: () => mockQueryResult
+    }),
+    query: {
+      users: {
+        findMany: () => Promise.resolve([]),
+        findFirst: () => Promise.resolve(null),
+      },
+      columns: {
+        findMany: () => Promise.resolve([]),
+        findFirst: () => Promise.resolve(null),
+      },
+      tasks: {
+        findMany: () => Promise.resolve([]),
+        findFirst: () => Promise.resolve(null),
+      }
+    },
+    insert: () => ({
+      values: () => ({
+        returning: () => Promise.resolve([])
+      })
+    }),
+    update: () => ({
+      set: () => ({
+        where: () => ({
+          returning: () => Promise.resolve([])
+        })
+      })
+    }),
+    delete: () => ({
+      where: () => Promise.resolve([])
+    })
   };
+} else {
+  if (isMySQL) {
+    // MySQL connection for freesqldatabase.com
+    const connectionPool = mysql.createPool({
+      uri: connectionString,
+      ssl: isProduction ? { rejectUnauthorized: false } : undefined
+    });
+    
+    // Create drizzle MySQL instance with the mode parameter
+    db = drizzleMySQL(connectionPool, { schema, mode: 'default' });
+  } else {
+    // Postgres connection for local development
+    // Connection options
+    const connectionOptions = {
+      max: 1,
+      ssl: isProduction ? { rejectUnauthorized: false } : false
+    };
 
-  // Connection pool for direct queries
-  const queryClient = postgres(connectionString, connectionOptions);
+    // Connection pool for direct queries
+    const queryClient = postgres(connectionString, connectionOptions);
 
-  // Create drizzle instance
-  db = drizzle(queryClient, { schema });
+    // Create drizzle instance
+    db = drizzle(queryClient, { schema });
+  }
 }
 
 export { db };
@@ -46,6 +89,11 @@ export { db };
 // Migration function
 export async function runMigrations() {
   console.log('Running migrations...');
+  
+  if (process.env.SKIP_DB_CONNECT === 'true') {
+    console.log('Skipping migrations due to SKIP_DB_CONNECT');
+    return;
+  }
   
   if (isMySQL) {
     console.log('MySQL migrations are not supported through this function. Please use db:push instead.');

@@ -3,6 +3,14 @@ const { columns, tasks, users, statusEnum } = require('./schema');
 const fs = require('fs');
 const path = require('path');
 
+// Define the TeamMember interface
+interface TeamMember {
+  id: string;
+  name: string;
+  role: string;
+  avatar: string;
+}
+
 // Read team members from file because we can't require from '../data' directly in CommonJS
 const teamMembersPath = path.join(__dirname, '..', 'data', 'team-members.ts');
 const teamMembersFile = fs.readFileSync(teamMembersPath, 'utf8');
@@ -24,7 +32,7 @@ async function seed() {
 
     // Seed users/team members
     const insertedUsers = await db.insert(users).values(
-      teamMembers.map((member) => ({
+      teamMembers.map((member: TeamMember) => ({
         name: member.name,
         email: `${member.name.toLowerCase().replace(/\s+/g, '.')}@example.com`,
         role: member.role,

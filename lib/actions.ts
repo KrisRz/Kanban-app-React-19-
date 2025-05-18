@@ -44,9 +44,9 @@ export async function getTasks() {
     const columnsData = await db.select().from(columns)
     
     // Manually map relationships
-    const data = taskData.map(task => {
-      const assignee = task.assigneeId ? usersData.find(u => u.id === task.assigneeId) : null
-      const column = columnsData.find(c => c.id === task.columnId)
+    const data = taskData.map((task: typeof tasks.$inferSelect) => {
+      const assignee = task.assigneeId ? usersData.find((u: typeof users.$inferSelect) => u.id === task.assigneeId) : null
+      const column = columnsData.find((c: typeof columns.$inferSelect) => c.id === task.columnId)
       
       return {
         ...task,
@@ -287,9 +287,9 @@ export const getKanbanData = cache(async () => {
     const usersData = await db.select().from(users);
     
     // Manually map relationships
-    const tasksWithRelations = taskData.map(task => {
-      const assignee = task.assigneeId ? usersData.find(u => u.id === task.assigneeId) : null;
-      const column = columnsData.find(c => c.id === task.columnId);
+    const tasksWithRelations = taskData.map((task: typeof tasks.$inferSelect) => {
+      const assignee = task.assigneeId ? usersData.find((u: typeof users.$inferSelect) => u.id === task.assigneeId) : null;
+      const column = columnsData.find((c: typeof columns.$inferSelect) => c.id === task.columnId);
       
       return {
         ...task,
