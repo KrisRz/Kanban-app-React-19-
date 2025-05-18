@@ -4,6 +4,7 @@ import postgres from 'postgres';
 import * as schema from './schema';
 import { drizzle as drizzleMySQL } from 'drizzle-orm/mysql2';
 import mysql from 'mysql2/promise';
+import { mockUsers, mockColumns, mockTasks } from './mock-data';
 
 // For use in a Node.js environment
 const connectionString = process.env.DATABASE_URL || 'postgres://postgres:postgres@localhost:5432/kanban';
@@ -77,27 +78,56 @@ if (process.env.SKIP_DB_CONNECT === 'true') {
       // Function to set up mock DB - moved outside the block to fix linter error
       const setupMockDB = () => {
         console.log('Using mock database in production as fallback');
-        const mockQueryResult: any[] = [];
         
-        // Create a mock DB object that returns empty results instead of failing
+        // Create a mock DB object with sample data
         return {
           select: () => ({
-            from: () => mockQueryResult,
-            where: () => mockQueryResult,
-            orderBy: () => mockQueryResult
+            from: () => [],
+            where: () => [],
+            orderBy: () => []
           }),
           query: {
             users: {
-              findMany: () => Promise.resolve([]),
-              findFirst: () => Promise.resolve(null),
+              findMany: () => Promise.resolve(mockUsers),
+              findFirst: ({ where }: any) => {
+                if (where?.id) {
+                  const user = mockUsers.find(u => u.id === where.id);
+                  return Promise.resolve(user || null);
+                }
+                if (where?.email) {
+                  const user = mockUsers.find(u => u.email === where.email);
+                  return Promise.resolve(user || null);
+                }
+                return Promise.resolve(mockUsers[0] || null);
+              },
             },
             columns: {
-              findMany: () => Promise.resolve([]),
-              findFirst: () => Promise.resolve(null),
+              findMany: () => Promise.resolve(mockColumns),
+              findFirst: ({ where }: any) => {
+                if (where?.id) {
+                  const column = mockColumns.find(c => c.id === where.id);
+                  return Promise.resolve(column || null);
+                }
+                return Promise.resolve(mockColumns[0] || null);
+              },
             },
             tasks: {
-              findMany: () => Promise.resolve([]),
-              findFirst: () => Promise.resolve(null),
+              findMany: ({ where }: any = {}) => {
+                if (where?.column_id) {
+                  return Promise.resolve(mockTasks.filter(t => t.column_id === where.column_id));
+                }
+                if (where?.assignee_id) {
+                  return Promise.resolve(mockTasks.filter(t => t.assignee_id === where.assignee_id));
+                }
+                return Promise.resolve(mockTasks);
+              },
+              findFirst: ({ where }: any) => {
+                if (where?.id) {
+                  const task = mockTasks.find(t => t.id === where.id);
+                  return Promise.resolve(task || null);
+                }
+                return Promise.resolve(mockTasks[0] || null);
+              },
             }
           },
           insert: () => ({
