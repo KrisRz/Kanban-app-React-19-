@@ -12,7 +12,7 @@ import mysql from 'mysql2/promise';
 dotenv.config();
 
 // Database connection string with default for testing
-const dbUrl = process.env.DATABASE_URL || 'mysql://sql8779451:M8hGX38u74@sql8.freesqldatabase.com:3306/sql8779451';
+const dbUrl = process.env.DATABASE_URL || 'mysql://username:password@localhost:3306/database';
 
 async function checkConnection() {
   console.log('MySQL Connection Test');

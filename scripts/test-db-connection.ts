@@ -7,7 +7,7 @@ dotenv.config();
 
 // Set database URL manually if not in .env file
 process.env.DATABASE_URL = process.env.DATABASE_URL || 
-  "mysql://sql8779451:M8hGX38u74@sql8.freesqldatabase.com:3306/sql8779451";
+  "mysql://username:password@localhost:3306/database";
 
 async function testDatabaseConnection() {
   console.log('Testing database connection...');
