@@ -1,5 +1,3 @@
-This project is for demonstration purposes only. For code access or questions, please contact me.
-
 # Kanban Task Management App
 
 A modern task management application built with cutting-edge technologies, designed to help teams visualize and manage their workflow efficiently.
@@ -41,16 +39,6 @@ This Kanban board application features a clean, intuitive interface that allows 
 - Intuitive UI/UX with interactive elements
 - Robust error handling and loading states
 
-## Screenshots
-
-![Kanban Board](public/screenshots/kanban-board.png)
-*Main Kanban board with drag-and-drop functionality*
-
-![Task Card Design](public/screenshots/task-card.png)
-*Professional task card design with status indicators*
-
-![User Management](public/screenshots/user-management.png)
-*User management interface*
 
 ## Key Features
 
