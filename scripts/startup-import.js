@@ -16,20 +16,14 @@ if (fs.existsSync(IMPORT_FLAG_FILE)) {
 // Run the import process
 console.log('Starting data import on first startup...');
 
-// Execute the import script
-exec('npx ts-node -T scripts/import-data.ts', (error, stdout, stderr) => {
-  if (error) {
-    console.error(`Import error: ${error.message}`);
-    return;
-  }
-  
-  if (stderr) {
-    console.error(`Import stderr: ${stderr}`);
-  }
-  
-  console.log(`Import stdout: ${stdout}`);
+// Directly run the import script
+try {
+  console.log('Importing data using direct require...');
+  require('./import-data.js');
   
   // Create a flag file to indicate import was completed
   fs.writeFileSync(IMPORT_FLAG_FILE, new Date().toISOString());
   console.log('Import completed. Created flag file.');
-}); 
+} catch (error) {
+  console.error('Error during data import:', error);
+} 
