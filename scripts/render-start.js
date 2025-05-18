@@ -6,11 +6,48 @@
  * to avoid multiple connection attempts that can get the IP blocked
  */
 
-const mysql = require('mysql2/promise');
 const { exec } = require('child_process');
+const net = require('net');
 
 // Parse the database URL
 const connectionString = process.env.DATABASE_URL;
+
+// Function to check if a port is reachable
+function checkPort(host, port, timeout = 10000) {
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    let status = false;
+    let error = null;
+
+    // Set timeout
+    socket.setTimeout(timeout);
+
+    // Handle successful connection
+    socket.on('connect', () => {
+      status = true;
+      socket.end();
+    });
+
+    // Handle timeout
+    socket.on('timeout', () => {
+      error = new Error('Connection timeout');
+      socket.destroy();
+    });
+
+    // Handle errors
+    socket.on('error', (err) => {
+      error = err;
+    });
+
+    // Handle close
+    socket.on('close', () => {
+      resolve({ status, error });
+    });
+
+    // Attempt connection
+    socket.connect(port, host);
+  });
+}
 
 async function checkDatabaseConnection() {
   if (!connectionString || !connectionString.includes('mysql://')) {
@@ -21,33 +58,25 @@ async function checkDatabaseConnection() {
   try {
     // Extract connection details from the connection string
     const connectionDetails = connectionString.replace('mysql://', '').split('@');
-    const [userPass, hostPort] = connectionDetails;
-    const [user, password] = userPass.split(':');
+    const [, hostPort] = connectionDetails;
     const [host, portDb] = hostPort.split(':');
-    const [port, database] = portDb ? portDb.split('/') : ['3306', hostPort.split('/')[1]];
+    const port = portDb ? portDb.split('/')[0] : '3306';
 
-    console.log(`Checking MySQL connection to database: ${database} on host: ${host} (Once only)`);
+    console.log(`Checking MySQL host connectivity: ${host}:${port} (TCP check only)`);
 
-    // Create a single connection (not a pool) for the initial test
-    const connection = await mysql.createConnection({
-      host,
-      user,
-      password,
-      database,
-      port: Number(port),
-      connectTimeout: 10000,
-      ssl: undefined
-    });
-
-    // Test connection with a simple query
-    await connection.query('SELECT 1');
-    console.log('MySQL connection test successful');
+    // Just check if the host/port is reachable
+    const { status, error } = await checkPort(host, parseInt(port, 10));
     
-    // Close connection
-    await connection.end();
-    return true;
+    if (status) {
+      console.log('MySQL host is reachable');
+      return true;
+    } else {
+      console.error('MySQL host is not reachable:', error?.message || 'Unknown error');
+      console.log('Application will still start, but database functionality may be limited');
+      return false;
+    }
   } catch (error) {
-    console.error('MySQL connection test failed:', error);
+    console.error('MySQL connectivity check failed:', error);
     console.log('Application will still start, but database functionality may be limited');
     // We don't fail here - let the app handle database unavailability gracefully
     return false;
@@ -57,7 +86,9 @@ async function checkDatabaseConnection() {
 // Start the Next.js application
 function startApp() {
   console.log('Starting Next.js application...');
-  const nextStart = exec('npm start', (error, stdout, stderr) => {
+  
+  // Just run the server.js file directly instead of using npm start
+  const nextStart = exec('node server.js', (error, stdout, stderr) => {
     if (error) {
       console.error(`Error starting Next.js: ${error.message}`);
       return;
