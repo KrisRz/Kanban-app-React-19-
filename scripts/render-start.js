@@ -7,6 +7,43 @@
  */
 
 const { exec } = require('child_process');
+const fs = require('fs');
+const path = require('path');
+
+// Flag file to check if data import has been completed
+const IMPORT_FLAG_FILE = path.join(process.cwd(), '.import_completed');
+
+// Function to run the data import
+function runDataImport() {
+  console.log('Running data import from MySQL to PostgreSQL...');
+  
+  try {
+    // Check if import has already been done
+    if (fs.existsSync(IMPORT_FLAG_FILE)) {
+      console.log('Data already imported. Skipping import.');
+      return;
+    }
+    
+    // Run the import script as a separate process
+    const importProcess = exec('node scripts/startup-import.js', (error, stdout, stderr) => {
+      if (error) {
+        console.error(`Error during import: ${error.message}`);
+        return;
+      }
+      
+      if (stderr) {
+        console.error(`Import stderr: ${stderr}`);
+      }
+      
+      console.log(`Import process completed: ${stdout}`);
+    });
+    
+    importProcess.stdout.pipe(process.stdout);
+    importProcess.stderr.pipe(process.stderr);
+  } catch (error) {
+    console.error('Failed to run data import:', error);
+  }
+}
 
 // Skip database check completely and just start the app
 // This is the most reliable approach for deployment
@@ -44,6 +81,10 @@ function startApp() {
 function main() {
   console.log('Render startup script running...');
   console.log('DATABASE_URL is set:', !!process.env.DATABASE_URL);
+  
+  // Run data import before starting the app
+  runDataImport();
+  
   console.log('Skipping connection check and starting app directly');
   
   // Just start the app without any database check
