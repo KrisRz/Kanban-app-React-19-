@@ -2,6 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 const { Pool } = require('pg');
+const createSchema = require('./create-db-schema');
 
 // Create a new pool using the environment variable
 const pool = new Pool({
@@ -16,6 +17,14 @@ async function importData() {
   
   let client;
   try {
+    // First create the schema
+    console.log('Creating database schema...');
+    const schemaCreated = await createSchema();
+    if (!schemaCreated) {
+      console.error('Failed to create database schema, aborting import');
+      return;
+    }
+    
     // Get a client from the pool
     client = await pool.connect();
     console.log('Connected to PostgreSQL database');
@@ -88,8 +97,10 @@ async function importData() {
     }
     
     console.log('Data import complete!');
+    return true;
   } catch (error) {
     console.error('Error importing data:', error);
+    return false;
   } finally {
     if (client) {
       client.release();
@@ -102,10 +113,14 @@ async function importData() {
 }
 
 // Run the import
-importData().then(() => {
-  console.log('Import script completed');
+importData().then((success) => {
+  if (success) {
+    console.log('Import script completed successfully');
+  } else {
+    console.error('Import script completed with errors');
+  }
   process.exit(0);
 }).catch(err => {
-  console.error('Import script failed:', err);
+  console.error('Import script failed with unhandled error:', err);
   process.exit(1);
 }); 

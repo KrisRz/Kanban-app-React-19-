@@ -6,27 +6,9 @@
  * to avoid multiple connection attempts that can get the IP blocked
  */
 
-const { exec, execSync } = require('child_process');
+const { exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
-
-// Make sure the pg module is installed
-function ensurePgInstalled() {
-  try {
-    require('pg');
-    console.log('pg module is installed');
-    return true;
-  } catch (e) {
-    console.log('pg module is not installed, installing...');
-    try {
-      execSync('npm install pg');
-      return true;
-    } catch (err) {
-      console.error('Failed to install pg:', err);
-      return false;
-    }
-  }
-}
 
 // Flag file to check if data import has been completed
 const IMPORT_FLAG_FILE = path.join(process.cwd(), '.import_completed');
@@ -41,9 +23,6 @@ function runDataImport() {
       console.log('Data already imported. Skipping import.');
       return;
     }
-    
-    // Make sure pg is installed
-    ensurePgInstalled();
     
     // Run the import script directly
     console.log('Importing data...');
