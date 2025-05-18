@@ -1,3 +1,5 @@
+This project is for demonstration purposes only. For code access or questions, please contact me.
+
 # Kanban Task Management App
 
 A modern task management application built with cutting-edge technologies, designed to help teams visualize and manage their workflow efficiently.
