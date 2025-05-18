@@ -3,28 +3,12 @@
 import Link from 'next/link'
 import { ThemeToggle } from './theme-toggle'
 import { Users } from 'lucide-react'
-import { getUserCount } from '@/lib/actions'
-import { useEffect, useState } from 'react'
 import { Badge } from './ui/badge'
 import { usePathname } from 'next/navigation'
+import { UserCounter } from './user-counter'
 
 export function Navbar() {
-  const [userCount, setUserCount] = useState<number | null>(null)
   const pathname = usePathname()
-
-  useEffect(() => {
-    async function fetchUserCount() {
-      const count = await getUserCount()
-      setUserCount(Number(count))
-    }
-    
-    fetchUserCount()
-    
-    // Re-fetch user count on each navigation
-    const interval = setInterval(fetchUserCount, 5000)
-    
-    return () => clearInterval(interval)
-  }, [pathname]) // Re-run when pathname changes
   
   return (
     <div className="w-full flex justify-center mt-4">
@@ -40,11 +24,7 @@ export function Navbar() {
             >
               <Users className="h-4 w-4" />
               <span>Users</span>
-              {userCount !== null && (
-                <Badge variant="secondary" className="ml-1 text-xs">
-                  {userCount}
-                </Badge>
-              )}
+              <UserCounter />
             </Link>
             <ThemeToggle />
           </div>

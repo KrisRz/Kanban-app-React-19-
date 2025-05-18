@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { User } from '@/lib/types'
 import { UserCard } from '@/components/user-card'
 
-export default async function UsersPage() {
+export default function UsersPage() {
   return (
     <div className="container mx-auto py-10 px-4">
       <div className="flex justify-between items-center mb-6">
