@@ -10,8 +10,8 @@ const { exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-// Flag file to check if data import has been completed
-const IMPORT_FLAG_FILE = path.join(process.cwd(), '.import_completed');
+// Flag file to check if data import has been completed - use /tmp directory which is writable
+const IMPORT_FLAG_FILE = path.join('/tmp', '.import_completed');
 
 // Function to check for pg module
 function checkPgModule() {
@@ -43,17 +43,24 @@ function runDataImport() {
       return false;
     }
     
-    // Create the flag file now (before import) to prevent multiple attempts
-    // in case the script is interrupted
-    fs.writeFileSync(IMPORT_FLAG_FILE, new Date().toISOString());
+    try {
+      // Create the flag file now (before import) to prevent multiple attempts
+      // in case the script is interrupted
+      fs.writeFileSync(IMPORT_FLAG_FILE, new Date().toISOString());
+      console.log('Created import flag file at', IMPORT_FLAG_FILE);
+    } catch (flagError) {
+      console.error('Could not create flag file, continuing anyway:', flagError.message);
+    }
     
     // Run the import script directly
     console.log('Importing data...');
     try {
       // Run the schema creation first
+      console.log('Creating database schema...');
       require('./create-db-schema.js');
       
       // Then import the data
+      console.log('Importing data from JSON...');
       require('./import-data.js');
       
       console.log('Import scripts executed successfully');

@@ -4,8 +4,8 @@ const path = require('path');
 const { Pool } = require('pg');
 const createSchema = require('./create-db-schema');
 
-// Flag file to check if data import has been completed
-const IMPORT_FLAG_FILE = path.join(process.cwd(), '.import_completed');
+// Flag file to check if data import has been completed - use /tmp directory which is writable
+const IMPORT_FLAG_FILE = path.join('/tmp', '.import_completed');
 
 // Create a new pool using the environment variable
 const pool = new Pool({
@@ -104,9 +104,13 @@ async function importData() {
     console.log('Data import complete!');
     
     // Create the flag file to indicate import has been completed
-    if (!fs.existsSync(IMPORT_FLAG_FILE)) {
-      fs.writeFileSync(IMPORT_FLAG_FILE, new Date().toISOString());
-      console.log('Created import flag file to prevent future imports.');
+    try {
+      if (!fs.existsSync(IMPORT_FLAG_FILE)) {
+        fs.writeFileSync(IMPORT_FLAG_FILE, new Date().toISOString());
+        console.log('Created import flag file at', IMPORT_FLAG_FILE, 'to prevent future imports.');
+      }
+    } catch (flagError) {
+      console.error('Could not create flag file:', flagError.message);
     }
     
     return true;
