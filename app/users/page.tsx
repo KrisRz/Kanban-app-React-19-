@@ -84,7 +84,9 @@ async function UsersList() {
   const taskCountsResult = await getUserTaskCounts();
   
   // Use the fetched task counts or default to empty object if there was an error
-  const userTaskCounts = taskCountsResult.success ? taskCountsResult.taskCounts : {};
+  const userTaskCounts: Record<number, number> = taskCountsResult.success && taskCountsResult.taskCounts 
+    ? taskCountsResult.taskCounts 
+    : {};
   
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -92,7 +94,7 @@ async function UsersList() {
         <UserCard 
           key={user.id} 
           user={user} 
-          taskCount={userTaskCounts[user.id] || 0} 
+          taskCount={userTaskCounts[user.id] ?? 0} 
         />
       ))}
     </div>
