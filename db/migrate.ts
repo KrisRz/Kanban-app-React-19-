@@ -6,7 +6,7 @@ runMigrations()
     console.log('✅ Migrations completed');
     process.exit(0);
   })
-  .catch((error) => {
+  .catch((error: unknown) => {
     console.error('❌ Migration failed:', error);
     process.exit(1);
   }); 
