@@ -61,9 +61,22 @@ if (process.env.SKIP_DB_CONNECT === 'true') {
 } else {
   if (isMySQL) {
     // MySQL connection for freesqldatabase.com
+    // Extract connection details from the connection string
+    const connectionDetails = connectionString.replace('mysql://', '').split('@');
+    const [userPass, hostPort] = connectionDetails;
+    const [user, password] = userPass.split(':');
+    const [host, portDb] = hostPort.split(':');
+    const [port, database] = portDb ? portDb.split('/') : ['3306', hostPort.split('/')[1]];
+
     const connectionPool = mysql.createPool({
-      uri: connectionString,
-      ssl: isProduction ? { rejectUnauthorized: false } : undefined
+      host,
+      user,
+      password,
+      database,
+      port: Number(port),
+      ssl: undefined, // Disable SSL by setting to undefined
+      connectTimeout: 10000,
+      connectionLimit: 5,
     });
     
     // Create drizzle MySQL instance with the mode parameter
