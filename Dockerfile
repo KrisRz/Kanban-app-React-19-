@@ -41,9 +41,13 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder /app/scripts ./scripts
+COPY --from=builder /app/data ./data
 
 # Make scripts executable
 RUN chmod +x ./scripts/render-start.js
+
+# Ensure pg module is installed for the database scripts (before switching to nextjs user)
+RUN npm install pg --no-save
 
 USER nextjs
 

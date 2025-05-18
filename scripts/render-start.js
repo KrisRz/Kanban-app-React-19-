@@ -6,49 +6,41 @@
  * to avoid multiple connection attempts that can get the IP blocked
  */
 
-const { exec, execSync } = require('child_process');
+const { exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
 // Flag file to check if data import has been completed
 const IMPORT_FLAG_FILE = path.join(process.cwd(), '.import_completed');
 
-// Function to ensure pg module is installed
-function ensurePgInstalled() {
+// Function to check for pg module
+function checkPgModule() {
   try {
     // Try to require the pg module
     require('pg');
-    console.log('pg module already installed');
+    console.log('pg module is available');
     return true;
   } catch (error) {
-    try {
-      // If module not found, try to install it
-      console.log('pg module not found, installing...');
-      execSync('npm install pg', { stdio: 'inherit' });
-      console.log('pg module installed successfully');
-      return true;
-    } catch (installError) {
-      console.error('Failed to install pg module:', installError);
-      return false;
-    }
+    console.error('pg module is not available:', error.message);
+    return false;
   }
 }
 
 // Function to run the data import
 function runDataImport() {
-  console.log('Running data import from MySQL to PostgreSQL...');
+  console.log('Running data import from JSON to PostgreSQL...');
   
   try {
     // Check if import has already been done
     if (fs.existsSync(IMPORT_FLAG_FILE)) {
       console.log('Data already imported. Skipping import.');
-      return;
+      return true;
     }
     
-    // Ensure pg is installed
-    if (!ensurePgInstalled()) {
-      console.error('Could not ensure pg is installed. Skipping import.');
-      return;
+    // Check if pg module is available
+    if (!checkPgModule()) {
+      console.error('pg module is not available. Skipping import.');
+      return false;
     }
     
     // Create the flag file now (before import) to prevent multiple attempts
@@ -57,10 +49,22 @@ function runDataImport() {
     
     // Run the import script directly
     console.log('Importing data...');
-    require('./create-db-schema.js');
-    require('./import-data.js');
+    try {
+      // Run the schema creation first
+      require('./create-db-schema.js');
+      
+      // Then import the data
+      require('./import-data.js');
+      
+      console.log('Import scripts executed successfully');
+      return true;
+    } catch (importError) {
+      console.error('Error executing import scripts:', importError);
+      return false;
+    }
   } catch (error) {
     console.error('Failed to run data import:', error);
+    return false;
   }
 }
 
@@ -102,9 +106,10 @@ function main() {
   console.log('DATABASE_URL is set:', !!process.env.DATABASE_URL);
   
   // Run data import before starting the app
+  // Even if import fails, we still start the app
   runDataImport();
   
-  console.log('Skipping connection check and starting app directly');
+  console.log('Starting the application...');
   
   // Just start the app without any database check
   startApp();
