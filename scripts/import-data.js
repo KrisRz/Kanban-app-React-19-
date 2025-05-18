@@ -4,6 +4,9 @@ const path = require('path');
 const { Pool } = require('pg');
 const createSchema = require('./create-db-schema');
 
+// Flag file to check if data import has been completed
+const IMPORT_FLAG_FILE = path.join(process.cwd(), '.import_completed');
+
 // Create a new pool using the environment variable
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -15,15 +18,17 @@ const pool = new Pool({
 async function importData() {
   console.log('Importing data into PostgreSQL database...');
   
+  // Check if import has already been done
+  if (fs.existsSync(IMPORT_FLAG_FILE)) {
+    console.log('Data already imported (flag file exists). Skipping import.');
+    return true;
+  }
+  
   let client;
   try {
-    // First create the schema
-    console.log('Creating database schema...');
-    const schemaCreated = await createSchema();
-    if (!schemaCreated) {
-      console.error('Failed to create database schema, aborting import');
-      return;
-    }
+    // Create schema if not already created
+    console.log('Creating database schema if needed...');
+    await createSchema();
     
     // Get a client from the pool
     client = await pool.connect();
@@ -97,6 +102,13 @@ async function importData() {
     }
     
     console.log('Data import complete!');
+    
+    // Create the flag file to indicate import has been completed
+    if (!fs.existsSync(IMPORT_FLAG_FILE)) {
+      fs.writeFileSync(IMPORT_FLAG_FILE, new Date().toISOString());
+      console.log('Created import flag file to prevent future imports.');
+    }
+    
     return true;
   } catch (error) {
     console.error('Error importing data:', error);

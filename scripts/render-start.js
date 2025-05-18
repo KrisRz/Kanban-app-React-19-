@@ -6,12 +6,33 @@
  * to avoid multiple connection attempts that can get the IP blocked
  */
 
-const { exec } = require('child_process');
+const { exec, execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
 // Flag file to check if data import has been completed
 const IMPORT_FLAG_FILE = path.join(process.cwd(), '.import_completed');
+
+// Function to ensure pg module is installed
+function ensurePgInstalled() {
+  try {
+    // Try to require the pg module
+    require('pg');
+    console.log('pg module already installed');
+    return true;
+  } catch (error) {
+    try {
+      // If module not found, try to install it
+      console.log('pg module not found, installing...');
+      execSync('npm install pg', { stdio: 'inherit' });
+      console.log('pg module installed successfully');
+      return true;
+    } catch (installError) {
+      console.error('Failed to install pg module:', installError);
+      return false;
+    }
+  }
+}
 
 // Function to run the data import
 function runDataImport() {
@@ -24,8 +45,19 @@ function runDataImport() {
       return;
     }
     
+    // Ensure pg is installed
+    if (!ensurePgInstalled()) {
+      console.error('Could not ensure pg is installed. Skipping import.');
+      return;
+    }
+    
+    // Create the flag file now (before import) to prevent multiple attempts
+    // in case the script is interrupted
+    fs.writeFileSync(IMPORT_FLAG_FILE, new Date().toISOString());
+    
     // Run the import script directly
     console.log('Importing data...');
+    require('./create-db-schema.js');
     require('./import-data.js');
   } catch (error) {
     console.error('Failed to run data import:', error);
