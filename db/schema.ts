@@ -4,7 +4,7 @@ import { relations } from 'drizzle-orm';
 // Create status enum
 export const statusEnum = pgEnum('status', ['todo', 'in-progress', 'done']);
 
-// Users/Assignees table
+// Users table
 export const users = pgTable('users', {
   id: serial('id').primaryKey(),
   name: text('name').notNull(),
@@ -19,7 +19,7 @@ export const users = pgTable('users', {
 export const columns = pgTable('columns', {
   id: serial('id').primaryKey(),
   name: text('name').notNull(),
-  order: serial('order').notNull(),
+  order: integer('order').notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull()
 });
@@ -29,12 +29,12 @@ export const tasks = pgTable('tasks', {
   id: serial('id').primaryKey(),
   title: text('title').notNull(),
   description: text('description'),
-  status: text('status').default('todo'),
+  status: statusEnum('status').default('todo'),
   assigneeId: integer('assignee_id').references(() => users.id),
   columnId: integer('column_id').references(() => columns.id, { onDelete: 'cascade' }).notNull(),
   order: integer('order').default(0),
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull()
 });
 
 // Define the users relations
@@ -49,6 +49,12 @@ export const columnsRelations = relations(columns, ({ many }) => ({
 
 // Define the tasks relations
 export const tasksRelations = relations(tasks, ({ one }) => ({
-  assignee: one(users),
-  column: one(columns)
+  assignee: one(users, {
+    fields: [tasks.assigneeId],
+    references: [users.id]
+  }),
+  column: one(columns, {
+    fields: [tasks.columnId],
+    references: [columns.id]
+  })
 })); 

@@ -350,43 +350,24 @@ export async function createTaskAction(data: {
     const order = tasksInColumn.length;
 
     // Create the task
-    try {
-      // Try PostgreSQL-style with returning
-      const result = await db.insert(tasks).values({
-        title: validatedData.title,
-        description: validatedData.description,
-        status: validatedData.status,
-        assigneeId: validatedData.assigneeId,
-        columnId: column.id,
-        order: order
-      }).returning();
+    const result = await db.insert(tasks).values({
+      title: validatedData.title,
+      description: validatedData.description,
+      status: validatedData.status,
+      assigneeId: validatedData.assigneeId as number | null,
+      columnId: column.id,
+      order: order
+    }).returning();
 
-      // Revalidate the path
-      revalidatePath("/");
-
-      return { success: true, task: result[0] };
-    } catch (e) {
-      // If returning() fails, use MySQL approach
-      await db.insert(tasks).values({
-        title: validatedData.title,
-        description: validatedData.description,
-        status: validatedData.status,
-        assigneeId: validatedData.assigneeId,
-        columnId: column.id,
-        order: order
-      });
-      
-      // Fetch the task we just created - get the most recent one with this title
-      const newTask = await db.query.tasks.findFirst({
-        where: eq(tasks.title, validatedData.title),
-        orderBy: (tasks, { desc }) => [desc(tasks.createdAt)]
-      });
-      
-      // Revalidate the path
-      revalidatePath("/");
-
-      return { success: true, task: newTask };
+    const createdTask = result[0];
+    if (!createdTask) {
+      throw new Error("Failed to create task")
     }
+
+    // Revalidate the path
+    revalidatePath("/");
+
+    return { success: true, task: createdTask };
   } catch (error) {
     if (error instanceof ZodError) {
       console.error("Validation error:", error.errors);
@@ -454,76 +435,43 @@ export async function updateTaskAction(data: {
       const newOrder = tasksInNewColumn.length > 0 ? tasksInNewColumn[0].order + 1 : 0
       
       // Update task with new column and order
-      try {
-        // Try PostgreSQL-style with returning
-        const result = await db.update(tasks)
-          .set({
-            title: validatedData.title,
-            description: validatedData.description,
-            status: validatedData.status,
-            assigneeId: validatedData.assigneeId,
-            columnId: newColumnId,
-            order: newOrder
-          })
-          .where(eq(tasks.id, validatedData.id))
-          .returning()
-        
-        revalidatePath("/")
-        return { success: true, task: result[0] }
-      } catch (e) {
-        // If returning() fails, use MySQL approach
-        await db.update(tasks)
-          .set({
-            title: validatedData.title,
-            description: validatedData.description,
-            status: validatedData.status,
-            assigneeId: validatedData.assigneeId,
-            columnId: newColumnId,
-            order: newOrder
-          })
-          .where(eq(tasks.id, validatedData.id))
-        
-        // Fetch the updated task
-        const updatedTask = await db.query.tasks.findFirst({
-          where: eq(tasks.id, validatedData.id)
+      const result = await db.update(tasks)
+        .set({
+          title: validatedData.title,
+          description: validatedData.description,
+          status: validatedData.status,
+          assigneeId: validatedData.assigneeId as number | null,
+          columnId: newColumnId,
+          order: newOrder
         })
-        
-        revalidatePath("/")
-        return { success: true, task: updatedTask }
+        .where(eq(tasks.id, validatedData.id))
+        .returning()
+      
+      const updatedTask = result[0];
+      if (!updatedTask) {
+        throw new Error("Failed to update task")
       }
+      
+      revalidatePath("/")
+      return { success: true, task: updatedTask }
     } else {
       // Just update the task details, not moving columns
-      try {
-        // Try PostgreSQL-style with returning
-        const result = await db.update(tasks)
-          .set({
-            title: validatedData.title,
-            description: validatedData.description,
-            assigneeId: validatedData.assigneeId
-          })
-          .where(eq(tasks.id, validatedData.id))
-          .returning()
-        
-        revalidatePath("/")
-        return { success: true, task: result[0] }
-      } catch (e) {
-        // If returning() fails, use MySQL approach
-        await db.update(tasks)
-          .set({
-            title: validatedData.title,
-            description: validatedData.description,
-            assigneeId: validatedData.assigneeId
-          })
-          .where(eq(tasks.id, validatedData.id))
-        
-        // Fetch the updated task
-        const updatedTask = await db.query.tasks.findFirst({
-          where: eq(tasks.id, validatedData.id)
+      const result = await db.update(tasks)
+        .set({
+          title: validatedData.title,
+          description: validatedData.description,
+          assigneeId: validatedData.assigneeId as number | null
         })
-        
-        revalidatePath("/")
-        return { success: true, task: updatedTask }
+        .where(eq(tasks.id, validatedData.id))
+        .returning()
+      
+      const updatedTask = result[0];
+      if (!updatedTask) {
+        throw new Error("Failed to update task")
       }
+      
+      revalidatePath("/")
+      return { success: true, task: updatedTask }
     }
   } catch (error) {
     console.error("Error updating task:", error)

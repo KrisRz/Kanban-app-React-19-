@@ -16,8 +16,8 @@ export const createTaskSchema = z.object({
   description: z.string().nullable(),
   status: z.enum(["todo", "in-progress", "done"]),
   assigneeId: z.number().nullable(),
-  columnId: z.number().optional(),
-  order: z.number().optional()
+  columnId: z.number().positive("Column ID must be a positive number"),
+  order: z.number().int("Order must be an integer").nonnegative("Order must be non-negative")
 })
 
 // Schema for task update (all fields optional)
@@ -26,7 +26,7 @@ export const updateTaskSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().nullable(),
   status: z.enum(["todo", "in-progress", "done"]),
-  assigneeId: z.number().nullable(),
+  assigneeId: z.number().nullable()
 })
 
 // Schema for task status update

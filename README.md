@@ -23,7 +23,7 @@ This Kanban board application features a clean, intuitive interface that allows 
 
 ### Backend
 - **Next.js Server Actions** for data mutations
-- **MySQL/PostgreSQL** database
+- **PostgreSQL** database
 - **Drizzle ORM** for type-safe database access
 
 ### Features
