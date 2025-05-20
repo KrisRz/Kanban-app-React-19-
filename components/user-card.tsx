@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { User } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { ExternalLink, Briefcase, Mail, BarChart4, User as UserIcon, Pencil } from 'lucide-react';
-import Image from 'next/image';
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
 // Map of roles to colors
 const roleColors: Record<string, { bg: string; text: string }> = {
@@ -42,19 +42,14 @@ export function UserCard({ user, taskCount = 0 }: UserCardProps) {
         {/* Main card content that links to user profile */}
         <Link href={`/users/${user.id}`} className="block">
           <div className="flex items-center gap-4">
-            {user.avatar ? (
-              <Image
-                src={user.avatar}
-                alt={`${user.name}'s profile picture`}
-                className="w-14 h-14 rounded-full object-cover border-2 border-gray-100 dark:border-zinc-700"
-                width={56}
-                height={56}
-              />
-            ) : (
-              <div className="w-14 h-14 rounded-full bg-blue-500 flex items-center justify-center text-xl font-medium text-white">
+            <Avatar className="w-14 h-14 border-2 border-gray-100 dark:border-zinc-700">
+              {user.avatar ? (
+                <AvatarImage src={user.avatar} alt={user.name} />
+              ) : null}
+              <AvatarFallback className="text-xl bg-blue-500 text-white">
                 {initials}
-              </div>
-            )}
+              </AvatarFallback>
+            </Avatar>
             
             <div className="flex-1">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{user.name}</h3>
