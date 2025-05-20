@@ -70,6 +70,9 @@ This Kanban board application features a clean, intuitive interface that allows 
 - **Progressive Enhancement**: Works even with JavaScript disabled
 - **Database Abstraction**: Using Drizzle ORM for type-safe database operations
 
+## About
+A modern Kanban task management application built with Next.js 15, React 19, and Tailwind CSS. Features drag-and-drop task management, user assignment, status tracking, and responsive design with dark mode support. Uses PostgreSQL database with Drizzle ORM and includes Docker configuration for easy deployment to Render.
+
 ---
 
 Designed and developed by Krzysztof Rzepka
