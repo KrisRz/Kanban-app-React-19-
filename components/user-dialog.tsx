@@ -142,11 +142,13 @@ export function UserDialog({
         onOpenChange(false)
         router.refresh()
         
-        // Redirect to users list page after successful update
+        // Redirect to users list page after successful create or update
         if (mode === "edit" && !embedded) {
           router.push("/users")
         } else if (mode === "edit" && embedded) {
           router.push(`/users/${user?.id}`)
+        } else if (mode === "create") {
+          router.push("/users")
         }
       } else {
         if (result.fieldErrors) {
