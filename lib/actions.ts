@@ -616,6 +616,7 @@ export async function createUserAction(data: {
       
       // Revalidate the path
       revalidatePath('/');
+      revalidatePath('/users');
       
       return { success: true, user: result[0] };
     } catch (e) {
@@ -634,6 +635,7 @@ export async function createUserAction(data: {
       
       // Revalidate the path
       revalidatePath('/');
+      revalidatePath('/users');
       
       return { success: true, user: newUser };
     }
